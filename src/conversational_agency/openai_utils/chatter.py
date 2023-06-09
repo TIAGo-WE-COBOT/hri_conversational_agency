@@ -2,8 +2,7 @@ import openai
 
 from conversational_agency.openai_utils.cfg import API_KEY
 from conversational_agency.openai_utils.logger import ChatLogger
-
-API_KEY     = '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'
+ 
 MAX_TOKENS  = 256   # max length of the responses
 TEMPERATURE = 0.6   # tune the "creativity" (i.e. confabulation) of the generated answers
 
