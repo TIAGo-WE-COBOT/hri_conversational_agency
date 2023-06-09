@@ -1,0 +1,14 @@
+<launch>
+    <!-- Set the path to the environment -->
+    <arg name = "venv"      default = "$(optenv OPENAI_VENV)" />
+    <arg name = "in_topic"  default = "input"   />
+    <arg name = "out_topic" default = "output"  />
+
+
+    <!-- Launch the node to chat with the conversational agent -->
+    <node pkg = "conversational_agency" type = "chat.py" name = "chat"
+    output = "screen" launch-prefix="$(arg venv)" >
+        <remap from = "request"   to = "$(arg in_topic)" />
+        <remap from = "response"  to = "$(arg out_topic)" />
+    </node> 
+</launch>
