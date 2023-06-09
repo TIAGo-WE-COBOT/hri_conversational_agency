@@ -12,12 +12,20 @@ TODO.
 
 - Get your API key from [this link](https://platform.openai.com/account/api-keys)
 - Set it in `src/conversational_agency/openai_utils/cfg.py`
+
+:warning: This will set your personal API key for your local version of the code. If you push it on Github, your private API will be visible to any user having access to your repo. To prevent this, follow the instructions below.
+
 - In a terminal, move to this repo and run
 ```
-git update-index --assume-unchanged src/conversational_agency/openai_utils/cfg.py
+git update-index --skip-worktree src/conversational_agency/openai_utils/cfg.py
 ```
 
-This will set your personal API key for your local version of the code, but prevent it to be uploaded in Github on push. 
+to prevent the file with your API key to be uploaded in Github on push. 
+
+- If, for any reason, you are willing to save in Git/Github changes made to the `cfg.py` file revert the previous command with
+```
+git update-index --skip-worktree src/conversational_agency/openai_utils/cfg.py
+```
 
 ## How to run
 
@@ -31,3 +39,9 @@ TODO.
 
 ### - openai.error.AuthenticationError: \<empty message\>
 The error is tracked in this [Github issue](https://github.com/openai/openai-python/issues/464). Try to generate a new API key and replace the existing one.
+
+## TODO
+
+- [ ] set the API key in a different way. As of now, one cannot commit changes to (e.g.) `PROMPT_TEMPLATE`
+    - [ ] env variable
+    - [ ] different file
