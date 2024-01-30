@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>conversational_agency</name>
+  <name>hri_conversational_agency</name>
   <version>0.0.0</version>
   <description>A package implementing Python modules to easily integrate conversational agents into ROS nodes. Demo nodes are provided. </description>
 
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/conversational_agency</url> -->
+  <!-- <url type="website">http://wiki.ros.org/hri_conversational_agency</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
