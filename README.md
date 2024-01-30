@@ -42,6 +42,7 @@ The error is tracked in this [Github issue](https://github.com/openai/openai-pyt
 
 ## TODO
 
+- [ ] modify the package name to `hri_conversational_agency` in the README
 - [ ] set the API key in a different way. As of now, one cannot commit changes to (e.g.) `PROMPT_TEMPLATE`
     - [ ] env variable
     - [ ] different file
