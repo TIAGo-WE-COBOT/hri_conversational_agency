@@ -76,6 +76,7 @@ class ChatBot():
         prompt = self.ai_chatter.generate_s_prompt()
         #r_ans = self.ai_chatter.generate_response(prompt, h_prompt) #string genereted by the model
         r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
+        print(h_prompt, "\n")
         print(r_ans)
         if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
             self.n_interactions = self.n_interactions + 1
