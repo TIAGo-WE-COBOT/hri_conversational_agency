@@ -47,8 +47,11 @@ git update-index --skip-worktree src/conversational_agency/openai_utils/cfg.py
 TODO.
 
 ## How to use
-
-TODO.
+It's possible to use the package in four possible configurations:
+1.  
+2.
+3.
+4.
 
 ## Troubleshooting
 
