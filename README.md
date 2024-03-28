@@ -47,11 +47,18 @@ git update-index --skip-worktree src/conversational_agency/openai_utils/cfg.py
 TODO.
 
 ## How to use
-It's possible to use the package in four possible configurations:
-1.  
-2.
-3.
-4.
+It's possible to launch the package in four possible configurations:
+1. Default: launch the conversational agent script, whisper_node, audio_capture and soundplay in all at once
+Depending on where you want to launch audio_capture and soundplay you can: 
+2. launch the conversational agent script, whisper_node and soundplay in one terminal using the command:
+   roslaunch hri_conversational_agency chat_vocal.launch audio_capture:=false
+   and then launch audio_capture in another terminal (E.g. TIAGo)
+3. launch the conversational agent script, whisper_node and audio_capture in one terminal using the command:
+   roslaunch hri_conversational_agency chat_vocal.launch tts:=false
+   and then launch soundplay in another terminal (E.g. TIAGo)
+4. launch the conversational agent script, whisper_node in one terminal using the command:
+   roslaunch hri_conversational_agency chat_vocal.launch audio_capture:=false tts:=false
+   and then launch audio_capture and soundplay in different terminals (in a separate way)
 
 ## Troubleshooting
 
