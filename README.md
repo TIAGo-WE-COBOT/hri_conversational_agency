@@ -50,7 +50,8 @@ TODO.
 It's possible to launch the package in four possible configurations:
 1. Default: launch the conversational agent script, whisper_node, audio_capture and soundplay in all at once.
    
-Depending on where you want to launch audio_capture and soundplay you can: 
+Depending on where you want to launch audio_capture and soundplay you can:
+
 2. launch the conversational agent script, whisper_node and soundplay in one terminal using the command:
    ```
    roslaunch hri_conversational_agency chat_vocal.launch audio_capture:=false
