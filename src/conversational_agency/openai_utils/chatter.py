@@ -13,9 +13,12 @@ class OpenAIChatter():
         self.log.log_system_prompt(SYSTEM_PROMPT_TEMPLATE)
         self.client = OpenAI()
         self.model = model
+        #self.system_prompt = SYSTEM_PROMPT_TEMPLATE
     
-    def generate_s_prompt(self):
+    def generate_s_prompt(self, n_mod, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
+        self.PERS_SYSTEM_PROMPT_TEMPLATE = "genere {}, fascia d'eta' {}, istruzione {}, professione {}, interessi {}, extraversion {}, agreeableness {}, conscientiousness {}, neuroticism {}, opennes {}".format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
         prompt = SYSTEM_PROMPT_TEMPLATE
+        print(self.PERS_SYSTEM_PROMPT_TEMPLATE)
         return prompt
 
     def generate_response(self, prompt, u_prompt, max_tokens = MAX_TOKENS, temperature = TEMPERATURE):

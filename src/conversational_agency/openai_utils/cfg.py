@@ -21,5 +21,7 @@ TEMPERATURE = 0.6   # tune the "creativity" (i.e. confabulation) of the generate
 Some tips to define a good prompt can be found here: https://help.openai.com/en/articles/6654000-best-practices-for-prompt-engineering-with-openai-api
 '''
 
-#SYSTEM_PROMPT_TEMPLATE = "Sei un service robot di nome Tiago che fa accoglienza in un laboratorio di nome UII-COBOT (wearable collaborative robotics). Devi dare il benvenuto ai visitatori"
-SYSTEM_PROMPT_TEMPLATE = "Sei un robot di servizio di nome Tiago. Devi condurre una conversazione con un anziano appassionato di film. Non salutare all'inizio della risposta. Ogni risposta deve avere meno di 50 tokens."
+SYSTEM_PROMPT_TEMPLATE = "Sei un service robot di nome Tiago che fa accoglienza in un laboratorio di nome UII-COBOT (wearable collaborative robotics). Devi dare il benvenuto ai visitatori"
+#PERS_SYSTEM_PROMPT_TEMPLATE = "Sei un robot di servizio di nome Tiago. Devi condurre una conversazione con un anziano appassionato di film. Non salutare all'inizio della risposta. Ogni risposta deve avere meno di 50 tokens."
+STD_SYSTEM_PROMPT_TEMPLATE = "std"
+PERS_SYSTEM_PROMPT_TEMPLATE = "pers"

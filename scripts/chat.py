@@ -4,15 +4,15 @@
 '''
 from class_SAY import SAY
 from timer import TIMER
-
 from conversational_agency.openai_utils.chatter import OpenAIChatter
+from openpyxl import Workbook, load_workbook
 
 import rospy
 from std_msgs.msg import String
 
 class ChatBot():
     def __init__(self):
-        self.state = "idle" #DEFINE all the states 
+        #self.state = "idle" #DEFINE all the states 
 
         # Initialize the OpenAI model to generate responses 
         self.ai_chatter = OpenAIChatter()
@@ -38,18 +38,58 @@ class ChatBot():
                                         String,
                                         queue_size=1
                                         )
-        self.timer = TIMER()
 
         self.n_interactions = 0
-
+        self.init_flag = False
         self.idle_flag = False
         self.h_listen_flag = True
         self.r_listen_flag = False
         self.r_talk_flag = False
+
+    def ci_penso(self):
+        if not self.init_flag:
+            try:
+                id = int(input("Inserire l'ID del paziente: "))
+                print(id)
+                self.n_mod = int(input("Rand mod: "))
+            except ValueError:
+                print("Inserire un ID valido")
+
+            
+            work_space = load_workbook(filename = "BFI assessment module TRIAL2copy.xlsx", data_only=True) #switch with the real path of the excel file
+            #work_space = load_workbook(filename = "test.xlsx", data_only=True)
+            pers_data = work_space["Preprocessed_Data"]
+            row = pers_data[id] #first row, substitute n with the current ID
+            #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
+            #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
+            self.gender = row[7].value
+            #print(self.gender)
+            self.age = row[8].value
+            self.education = row[9].value
+            self.job = row[10].value
+            self.interests = row[11].value
+            self.extraversion = row[57].value
+            #print(self.extraversion)
+            self.agreeableness = row[59].value
+            #print(self.agreeableness)
+            self.conscientiousness = row[61].value
+            #print(self.conscientiousness)
+            self.neuroticism = row[63].value
+            #print(self.neuroticism)
+            self.openness = row[65].value
+            #print(self.openness) 
+
+            #SSSYSTEM_PROMPT_TEMPLATE = "genere {}, fascia d'eta' {}, istruzione {}, professione {}, interessi {}, extraversion {}, agreeableness {}, conscientiousness {}, neuroticism {}, opennes {}".format(row[0].value, row[1].value, row[2].value)
+            #print(SSSYSTEM_PROMPT_TEMPLATE)
+            self.init_flag = True
+            self.state = "idle"
+            self.idle()
         
     def idle(self):
-        self.state = "listen"
-        self.idle_flag = True
+        if self.state == "idle" and self.idle_flag == False:
+            self.timer = TIMER()
+            self.state = "listen"
+            self.idle_flag = True
         
 
     def h_listen(self, msg): 
@@ -73,7 +113,7 @@ class ChatBot():
     def r_talk(self, h_prompt):
         if not self.state == "talk":
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
-        prompt = self.ai_chatter.generate_s_prompt()
+        prompt = self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
         #r_ans = self.ai_chatter.generate_response(prompt, h_prompt) #string genereted by the model
         r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
         print(h_prompt, "\n")
@@ -107,7 +147,8 @@ if __name__ == "__main__":
 
     rate = rospy.Rate(10)
     try:
-        cb.idle()
+        #cb.idle()
+        cb.ci_penso()
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')
