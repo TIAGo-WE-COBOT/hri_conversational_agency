@@ -24,4 +24,5 @@ Some tips to define a good prompt can be found here: https://help.openai.com/en/
 SYSTEM_PROMPT_TEMPLATE = "Sei un service robot di nome Tiago che fa accoglienza in un laboratorio di nome UII-COBOT (wearable collaborative robotics). Devi dare il benvenuto ai visitatori"
 #PERS_SYSTEM_PROMPT_TEMPLATE = "Sei un robot di servizio di nome Tiago. Devi condurre una conversazione con un anziano appassionato di film. Non salutare all'inizio della risposta. Ogni risposta deve avere meno di 50 tokens."
 STD_SYSTEM_PROMPT_TEMPLATE = "std"
-PERS_SYSTEM_PROMPT_TEMPLATE = "pers"
+PERS_SYSTEM_PROMPT_TEMPLATE = "genere {}, fascia d'eta' {}, istruzione {}, professione {}, interessi {}, extraversion {}, agreeableness {}, conscientiousness {}, neuroticism {}, opennes {}\n"
+#PROMPT = "Answer in max two sentences. Answer in the language of the input.\nText:###{}###"

@@ -3,7 +3,7 @@
 import time
 import rospy
 
-class TIMER:
+class MyTimer:
     def __init__(self):
         self.start_time = time.perf_counter()
         self.beg_time = time.perf_counter()
@@ -40,7 +40,7 @@ class TIMER:
 
 if __name__ == "__main__":
     rospy.init_node('timer')
-    t = TIMER()
+    t = MyTimer()
 
     rate = rospy.Rate(10)
     try:

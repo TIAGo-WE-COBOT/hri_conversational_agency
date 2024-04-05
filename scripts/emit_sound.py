@@ -1,20 +1,19 @@
 #!/usr/bin/env python
 
-from say_cfg import VOICE, VOLUME
-from sound_play.libsoundplay import SoundClient
+VOICE = 'voice_pc_diphone'
+VOLUME = 1
 
 import rospy
-from std_msgs.msg import Bool, String
+from std_msgs.msg import String
+from sound_play.libsoundplay import SoundClient
 
-class SAY():
+class EmitSound():
     def __init__(self):
-        self.soundhandle = SoundClient(blocking=True)
+        self.soundhandle = SoundClient(blocking=True) #In this way the flux is stopped untill the sound in completely reproduced
         self.voice = VOICE
         self.volume = VOLUME
-        #self.is_playing = Bool()
         self.is_playing = String()
         self.is_playing.data = "False"
-        #self.play_pb = rospy.Publisher("check/play", Bool, queue_size=1)
         self.play_pb = rospy.Publisher("check/play", String, queue_size=1)
 
     def r_say(self, string):

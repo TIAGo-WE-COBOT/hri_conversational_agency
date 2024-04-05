@@ -2,21 +2,21 @@
 
 ''' This script is a template to develop your own node implementing a conversational agent. One should override listen and talk methods to define custom behavior.
 '''
-from class_SAY import SAY
-from timer import TIMER
+from emit_sound import EmitSound
+from timer import MyTimer
 from conversational_agency.openai_utils.chatter import OpenAIChatter
 from openpyxl import Workbook, load_workbook
-
+import random
 import rospy
 from std_msgs.msg import String
 
 class ChatBot():
     def __init__(self):
-        #self.state = "idle" #DEFINE all the states 
+        self.state = "init" #DEFINE all the states 
 
         # Initialize the OpenAI model to generate responses 
         self.ai_chatter = OpenAIChatter()
-        self.r_sound = SAY()
+        self.r_sound = EmitSound()
 
         # Listen to the model response
         # When the model provides a response it triggers the method to let the user add a request
@@ -40,18 +40,22 @@ class ChatBot():
                                         )
 
         self.n_interactions = 0
+        self.slide_col = 0
         self.init_flag = False
         self.idle_flag = False
         self.h_listen_flag = True
         self.r_listen_flag = False
         self.r_talk_flag = False
+        self.id_flag = False
 
     def ci_penso(self):
-        if not self.init_flag:
+        if not self.init_flag and self.state == "init":
             try:
                 id = int(input("Inserire l'ID del paziente: "))
                 print(id)
-                self.n_mod = int(input("Rand mod: "))
+                self.n_mod = random.randint(1, 3)
+                #print(self.n_mod)
+
             except ValueError:
                 print("Inserire un ID valido")
 
@@ -59,35 +63,37 @@ class ChatBot():
             work_space = load_workbook(filename = "BFI assessment module TRIAL2copy.xlsx", data_only=True) #switch with the real path of the excel file
             #work_space = load_workbook(filename = "test.xlsx", data_only=True)
             pers_data = work_space["Preprocessed_Data"]
-            row = pers_data[id] #first row, substitute n with the current ID
+            col = pers_data["B"]
+            
+            while not self.id_flag:
+                if col[self.slide_col].value == id:
+                    row = pers_data[self.slide_col + 1]
+                    self.slide_col = 0
+                    self.id_flag = True
+                else:
+                    self.slide_col += 1
+                    self.id_flag = False
+
+            #row = pers_data[id] #first row, substitute n with the current ID
             #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
             #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
             self.gender = row[7].value
-            #print(self.gender)
             self.age = row[8].value
             self.education = row[9].value
             self.job = row[10].value
             self.interests = row[11].value
             self.extraversion = row[57].value
-            #print(self.extraversion)
             self.agreeableness = row[59].value
-            #print(self.agreeableness)
             self.conscientiousness = row[61].value
-            #print(self.conscientiousness)
             self.neuroticism = row[63].value
-            #print(self.neuroticism)
             self.openness = row[65].value
-            #print(self.openness) 
-
-            #SSSYSTEM_PROMPT_TEMPLATE = "genere {}, fascia d'eta' {}, istruzione {}, professione {}, interessi {}, extraversion {}, agreeableness {}, conscientiousness {}, neuroticism {}, opennes {}".format(row[0].value, row[1].value, row[2].value)
-            #print(SSSYSTEM_PROMPT_TEMPLATE)
             self.init_flag = True
             self.state = "idle"
             self.idle()
         
     def idle(self):
-        if self.state == "idle" and self.idle_flag == False:
-            self.timer = TIMER()
+        if self.state == "idle" and not self.idle_flag:
+            self.timer = MyTimer()
             self.state = "listen"
             self.idle_flag = True
         
@@ -113,8 +119,9 @@ class ChatBot():
     def r_talk(self, h_prompt):
         if not self.state == "talk":
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
-        prompt = self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
-        #r_ans = self.ai_chatter.generate_response(prompt, h_prompt) #string genereted by the model
+        #prompt = self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+        self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+        #r_ans = self.ai_chatter.generate_response(self.s_prompt, h_prompt) #string genereted by the model
         r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
         print(h_prompt, "\n")
         print(r_ans)
