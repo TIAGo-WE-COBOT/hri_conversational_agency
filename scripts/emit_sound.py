@@ -19,8 +19,8 @@ class EmitSound():
     def r_say(self, string):
         self.is_playing.data = "True"
         self.play_pb.publish(self.is_playing)
-        print(self.is_playing)
+        print("The robot is talking...")
         self.soundhandle.say(string, self.voice, self.volume)
         self.is_playing.data = "False"
         self.play_pb.publish(self.is_playing)
-        print(self.is_playing)
+        print("The robot ceased speaking.\n")

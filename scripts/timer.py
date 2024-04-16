@@ -19,7 +19,7 @@ class MyTimer:
     def initizialization(self):
         rospy.Timer(rospy.Duration(5), self.timer_cb, oneshot=True) #wait for n seconds
 
-    def elapsed_fixed_time(self):
+    def elapsed_fixed_time(self, th):
         while not self.time_flag:
             while not self.sec_flag:
                 self.end_time = time.perf_counter()
@@ -28,7 +28,7 @@ class MyTimer:
                     print(self.sec)
                     self.sec_flag = 1
                     self.start_time = time.perf_counter()
-                    if self.sec == 5: #elapsed time we want to measure
+                    if self.sec == th: #elapsed time we want to measure in seconds
                         self.time_flag = 1
             self.sec_flag = 0
         self.time_flag = 0

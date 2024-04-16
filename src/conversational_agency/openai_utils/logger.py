@@ -1,8 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import time
-
+import sys
 from datetime import datetime
 
 class ChatLogger:
@@ -23,6 +23,17 @@ class ChatLogger:
         except FileExistsError:
             pass
     
+    #print model parameters
+    def log_model_parameters(self, model, max_tokens, temperature, seed, frequency_penalty, presence_penalty):
+        self.f.write('MODEL PARAMETERS:\n \
+    Model: {}\n \
+    Max tokens: {}\n \
+    Temperature: {}\n \
+    Seed: {}\n \
+    Frequency penalty: {}\n \
+    Presence penalty: {}\n\n'.format(model, max_tokens, temperature, seed, frequency_penalty, presence_penalty)
+                    )
+
     #print the sysyem prompt in the log file
     def log_system_prompt(self, s_p_string):
          self.f.write('SYSTEM PROMPT: {}\n\n\n'.format(s_p_string))
@@ -38,11 +49,14 @@ class ChatLogger:
                                               ))
         
     #print the current number of the interaction
-    def log_curr_interaction(self,ni):
+    def log_curr_interaction(self, ni):
         self.f.write('Interaction n.{}:\n'.format(ni))
 
+    def log_tot_tokens(self, tot_tokens):
+        self.f.write('Total number of tokens: {} tokens\n'.format(tot_tokens))
+
     #print the number of interactions considering as a complete interaction a question of the human and the corresponding answer of the robot
-    def log_n_interactions(self,n):
+    def log_n_interactions(self, n):
         self.f.write('Total number of interactions: {}\n'.format(n))
 
     #print the duration of the conversation in the log file
