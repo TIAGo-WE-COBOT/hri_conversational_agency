@@ -11,13 +11,14 @@ class MyTimer:
         self.sec_flag = 0
         self.time_flag = 0
         self.sec = 0
+        self.init_timer_flag = True
     
     def timer_cb(self, event):
-        self.init_timer_flag = True
+        self.init_timer_flag = False
         print("Initialization completed")
 
-    def initizialization(self):
-        rospy.Timer(rospy.Duration(5), self.timer_cb, oneshot=True) #wait for n seconds
+    def fixed_timer(self, duration):
+        rospy.Timer(rospy.Duration(duration), self.timer_cb, oneshot=True) #wait for n seconds
 
     def elapsed_fixed_time(self, th):
         while not self.time_flag:

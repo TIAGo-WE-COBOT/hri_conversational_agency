@@ -24,6 +24,7 @@ class ChatBot():
         talk
         '''
 
+
         self.dummy_speech = ["domanda 1", \
                              "domanda 2"]#, \
                              #"domanda 3"]
@@ -48,10 +49,18 @@ class ChatBot():
                                         String,
                                         self.r_listen_cb
                                         )
-        
+        self.chat_timer_sub = rospy.Subscriber('check/init_timer', 
+                                                  String, 
+                                                  self.chat_timer_cb)
+
         # publisher relative to the robot
         self.r_res_pub = rospy.Publisher('r_response',
                                         String,
+                                        queue_size=1
+                                        )
+        
+        self.timer_pb = rospy.Publisher('check/init_timer', 
+                                        String, 
                                         queue_size=1
                                         )
 
@@ -63,9 +72,26 @@ class ChatBot():
         self.r_listen_flag = False
         self.r_talk_flag = False
         self.id_flag = False
+        self.chat_init_timer_flag = True
+
+    def init_timer(self, duration):
+        rospy.Timer(rospy.Duration(duration), self.init_timer_cb, oneshot=True)
+        print("init_timer")
+        
+    def init_timer_cb(self, event):
+        self.init_timer_string = String()
+        self.init_timer_string.data = "False"
+        self.timer_pb.publish(self.init_timer_string)
+
+    def chat_timer_cb(self, timer_chat):
+        if(timer_chat.data == "False"):
+            self.chat_init_timer_flag = False
+            #print("Initialization completed")
+            rospy.sleep(1)
+            self.setup()
 
     def setup(self):
-        if not self.init_flag and self.state == "init":
+        if((not(self.init_flag)) and (self.state == "init") and (not(self.chat_init_timer_flag))):
             print("PHASE: SETUP\n")
             try:
                 id = int(input("Inserire l'ID del paziente: "))
@@ -76,11 +102,14 @@ class ChatBot():
             
             rospack = rospkg.RosPack()
             pkg_root = rospack.get_path('hri_conversational_agency')
-            filepath = os.path.join(pkg_root, 
-                                    'scripts', 
-                                    'BFI assessment module TRIAL2copy.xlsx'
-                                    )
-            work_space = load_workbook(filename = filepath, data_only=True) #switch with the real path of the excel file
+            #print(pkg_root)
+            filepath_chat = os.path.join(pkg_root, 
+                                     'scripts', 
+                                     'BFI_assessment_module_TRIAL2copy.xlsx'
+                                     )
+        
+            work_space = load_workbook(filename = filepath_chat, data_only=True) #switch with the real path of the excel file
+            #work_space = load_workbook(filename = "BFI assessment module TRIAL2copy.xlsx", data_only=True)        
             #work_space = load_workbook(filename = "test.xlsx", data_only=True)
             pers_data = work_space["Preprocessed_Data"]
             col = pers_data["B"]
@@ -118,6 +147,7 @@ class ChatBot():
             self.state = "talk"
             self.dummy_flag= True
             self.r_talk("")
+            #During the first dummy interction the whisper_node must not publish anything
 
 
     def idle(self):
@@ -201,7 +231,7 @@ class ChatBot():
 if __name__ == "__main__":
     rospy.init_node('chatbot')
     cb = ChatBot()
-
+    print(cb.ai_chatter.log.fpath)
     def on_shutdown():
         cb.ai_chatter.log.log_n_interactions(cb.ai_chatter.n_interactions) #
         duration = cb.timer.elapsed_time()
@@ -214,7 +244,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(10)
     try:
         #cb.idle()
-        cb.setup()
+        cb.init_timer(15)
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')
