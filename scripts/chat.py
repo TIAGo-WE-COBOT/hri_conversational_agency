@@ -4,17 +4,32 @@
 '''
 from emit_sound import EmitSound
 from timer import MyTimer
-from conversational_agency.openai_utils.chatter import OpenAIChatter
+from hri_conversational_agency.openai_utils.chatter import OpenAIChatter
 from openpyxl import Workbook, load_workbook
+import os
 import json
 import random
+import rospkg
 import rospy
 from std_msgs.msg import String
 
 class ChatBot():
     def __init__(self):
         self.state = "init" #DEFINE all the states 
+        '''
+        init
+        dummy
+        idle
+        listen
+        talk
+        '''
 
+        self.dummy_speech = ["domanda 1", \
+                             "domanda 2"]#, \
+                             #"domanda 3"]
+        self.dummy_question = 0
+
+        self.real_conv = False #to switch betw the dummy and the real conversation
         # Initialize the OpenAI model to generate responses 
         self.ai_chatter = OpenAIChatter()
         self.r_sound = EmitSound()
@@ -23,7 +38,7 @@ class ChatBot():
         # When the model provides a response it triggers the method to let the user add a request
         self.h_req_sub = rospy.Subscriber('r_response',
                                         String,
-                                        self.h_listen
+                                        self.h_listen_cb
                                         )
 
         # listen to the user input
@@ -31,7 +46,7 @@ class ChatBot():
         # It has to suscribe to the topic used by ros_whisper
         self.r_req_sub = rospy.Subscriber('asr/string',
                                         String,
-                                        self.r_listen
+                                        self.r_listen_cb
                                         )
         
         # publisher relative to the robot
@@ -42,6 +57,7 @@ class ChatBot():
 
         self.slide_col = 0
         self.init_flag = False
+        self.dummy_flag = False
         self.idle_flag = False
         self.h_listen_flag = True
         self.r_listen_flag = False
@@ -58,7 +74,13 @@ class ChatBot():
             except ValueError:
                 print("Inserire un ID valido")
             
-            work_space = load_workbook(filename = "BFI assessment module TRIAL2copy.xlsx", data_only=True) #switch with the real path of the excel file
+            rospack = rospkg.RosPack()
+            pkg_root = rospack.get_path('hri_conversational_agency')
+            filepath = os.path.join(pkg_root, 
+                                    'scripts', 
+                                    'BFI assessment module TRIAL2copy.xlsx'
+                                    )
+            work_space = load_workbook(filename = filepath, data_only=True) #switch with the real path of the excel file
             #work_space = load_workbook(filename = "test.xlsx", data_only=True)
             pers_data = work_space["Preprocessed_Data"]
             col = pers_data["B"]
@@ -85,35 +107,47 @@ class ChatBot():
             self.neuroticism = row[63].value
             self.openness = row[65].value
             self.init_flag = True
-            self.state = "idle"
-            self.idle()
-        
+            #self.state = "idle"
+            self.state = "dummy"
+            #self.idle()
+            self.dummy()
+
+    def dummy(self):
+        if self.state == "dummy" and not self.dummy_flag:
+            print("PHASE: DUMMY_CONVERSATION\n")
+            self.state = "talk"
+            self.dummy_flag= True
+            self.r_talk("")
+
+
     def idle(self):
         if self.state == "idle" and not self.idle_flag:
             print("PHASE: IDLE\n")
             self.timer = MyTimer()
             self.state = "listen"
             self.idle_flag = True
+            
         
 
-    def h_listen(self, msg):
-        print("PHASE: HUMAN_LISTEN\n") 
+    def h_listen_cb(self, msg):
+        print("PHASE: HUMAN_LISTEN\n")
         if(msg.data=="flag" and self.state=="listen"):
             msg.data = ""
         if(self.idle_flag):
             self.h_listen_flag = True
         
 
-    def r_listen(self, msg):
+    def r_listen_cb(self, msg):
         print("PHASE: ROBOT_LISTEN...waiting for a trascription\n") 
         if not msg.data: #wait 'till string received
             rospy.logwarn('Empty string received, just skipping.')
             return
         if self.state == "listen":
             self.state = "talk"
-            if(self.idle_flag):
+            if(self.idle_flag or self.dummy_flag):
                 self.r_listen_flag = True
             self.r_talk(msg.data)
+
     
     # Once the model gets an user input, it provides the response
     def r_talk(self, h_prompt):
@@ -121,27 +155,48 @@ class ChatBot():
         if not self.state == "talk":
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
         
-        #decidere se generare il prompt con il setup oppure con la generazione della risposta
-        self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
-        
-        if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
-            self.ai_chatter.n_interactions = self.ai_chatter.n_interactions + 1 #
-            self.h_listen_flag = False
-            self.r_listen_flag = False
-        #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
-        r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
-        #print(h_prompt, "\n")
-        #print(r_ans)
-        self.ai_chatter.conversational_hystory(h_prompt, r_ans)
-        self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions) #
-        self.ai_chatter.log.log_input(h_prompt)
-        self.ai_chatter.log.log_output(r_ans, self.ai_chatter.model)
-        self.r_sound.r_say(r_ans)
-        r_msg = String()
-        r_msg.data = "flag"
-        self.r_res_pub.publish(r_msg)
-        r_msg.data = ""
-        self.state = "listen"    
+        if(self.real_conv):
+            #decidere se generare il prompt con il setup oppure con la generazione della risposta
+            self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+            
+            if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
+                self.ai_chatter.n_interactions = self.ai_chatter.n_interactions + 1 #
+                self.h_listen_flag = False
+                self.r_listen_flag = False
+            #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
+            r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
+            self.ai_chatter.conversational_hystory(h_prompt, r_ans)
+            self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions) #
+            self.ai_chatter.log.log_input(h_prompt)
+            self.ai_chatter.log.log_output(r_ans, self.ai_chatter.model)
+            self.r_sound.r_say(r_ans)
+            r_msg = String()
+            r_msg.data = "flag"
+            self.r_res_pub.publish(r_msg)
+            r_msg.data = ""
+            self.state = "listen"    
+
+
+        elif(not self.real_conv):
+            self.r_sound.r_say(self.dummy_speech[self.dummy_question])
+            self.dummy_question += 1
+            r_msg = String()
+            r_msg.data = "flag"
+            self.r_res_pub.publish(r_msg)
+            r_msg.data = ""
+            self.state = "listen"
+            if(self.dummy_question > (len(self.dummy_speech)-1)):
+                self.real_conv = True
+                r_msg.data = ""
+                self.r_res_pub.publish(r_msg)
+                self.state = "idle"
+                self.idle()
+
+        # r_msg = String()
+        # r_msg.data = "flag"
+        # self.r_res_pub.publish(r_msg)
+        # r_msg.data = ""
+        # self.state = "listen"    
 
 if __name__ == "__main__":
     rospy.init_node('chatbot')

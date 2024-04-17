@@ -1,6 +1,6 @@
 <launch>
     <!-- Set the path to the environment -->
-    <arg name = "venv"      default = "$ ~/HRI_ENV" />
+    <arg name = "venv"      default = "$(optenv HRI_VENV)" />
     <arg name = "in_topic"  default = "input"   />
     <arg name = "out_topic" default = "output"  />
 

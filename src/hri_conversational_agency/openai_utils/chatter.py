@@ -2,8 +2,8 @@
 
 from openai import OpenAI
 
-from conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE
-from conversational_agency.openai_utils.logger import ChatLogger
+from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE
+from hri_conversational_agency.openai_utils.logger import ChatLogger
 
 import json
 

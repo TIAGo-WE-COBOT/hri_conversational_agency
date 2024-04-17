@@ -1,0 +1,25 @@
+<launch>
+    <!-- Set the path to the environment -->
+    <arg name = "venv"      default = "$(optenv HRI_VENV)" />
+    <arg name = "in_topic"  default = "input"   />
+    <arg name = "out_topic" default = "output"  />
+    <!-- Choose wheter to launch nodes to interact 
+    with the robot via vocal interface -->
+    <arg name = "audio_capture" default = "true" /> <!-- set to false if you have `audio_capture` 
+                                                    on a different machine (e.g. the robot) -->
+    <arg name = "asr" default = "true" />
+    <arg name = "tts"   default = "true" />
+
+    <!-- Launch the node(s) for automatic speech recognition -->
+    <include file = "$(find ros_whisper)/launch/ros_whisper.launch" if = "$(arg asr)">
+        <arg name = "audio_capture" value = "$(arg audio_capture)" />
+    </include> 
+    <!-- Launch the node for text-to-speech-->
+    <node pkg = "sound_play" type = "soundplay_node.py" name = "soundplay_node" if = "$(arg tts)" />
+    <!-- Launch the node to chat with the conversational agent -->
+    <node pkg = "hri_conversational_agency" type = "chat.py" name = "chat"
+    output = "screen" launch-prefix="$(arg venv)" >
+        <remap from = "request"   to = "$(arg in_topic)" />
+        <remap from = "response"  to = "$(arg out_topic)" />
+    </node> 
+</launch>
