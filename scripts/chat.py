@@ -11,6 +11,7 @@ import json
 import random
 import rospkg
 import rospy
+import random
 from std_msgs.msg import String
 
 class ChatBot():
@@ -74,6 +75,19 @@ class ChatBot():
         self.id_flag = False
         self.chat_init_timer_flag = True
 
+        #randomization
+        self.exc_n = set()
+        self.gen_n = []
+        self.mod = ["LLM", "P_LLM", "CHATBOT"]
+        self.media = ["M", "V", "AL"]
+        self.trials = [[], [], []]
+
+        self.curr_mod = ""
+        self.curr_media = ""
+        self.curr_trial = 0
+
+        self.filename = "BFI_assessment_module_TRIAL2def.xlsx"
+
     def init_timer(self, duration):
         rospy.Timer(rospy.Duration(duration), self.init_timer_cb, oneshot=True)
         print("init_timer")
@@ -90,12 +104,38 @@ class ChatBot():
             rospy.sleep(1)
             self.setup()
 
+    def randomization(self, n1, n2, n_max, n_trials, trial1, trial2, trial3):   
+        for trial in range(n_trials):
+            while len(self.gen_n) < n_max:
+                rn = random.randint(n1, n2)
+                if(rn not in self.exc_n):
+                    if(trial == 0):
+                        self.trials[len(self.gen_n)].append(self.mod[(rn)-1])
+                        self.gen_n.append(rn)
+                        self.exc_n.add(rn)
+                    elif(trial == 1):
+                        self.trials[len(self.gen_n)].append(self.media[(rn)-1])
+                        self.gen_n.append(rn)
+                        self.exc_n.add(rn)
+                    else:
+                        self.trials[len(self.gen_n)].append(rn)
+                        self.gen_n.append(rn)
+                        self.exc_n.add(rn)
+            self.gen_n = []
+            self.exc_n = set()
+        self.trials = sorted(self.trials, key=lambda x: x[2])
+        self.pers_data[str(trial1)] = self.trials[0][0] + "\n" + self.trials[0][1]
+        self.pers_data[str(trial2)] = self.trials[1][0] + "\n" + self.trials[1][1]
+        self.pers_data[str(trial3)] = self.trials[2][0] + "\n" + self.trials[2][1]
+        print(self.trials)
+        self.work_space.save(filename = self.filename)
+
     def setup(self):
+        #self.randomization(1, 3, 3, 3)
         if((not(self.init_flag)) and (self.state == "init") and (not(self.chat_init_timer_flag))):
             print("PHASE: SETUP\n")
             try:
                 id = int(input("Inserire l'ID del paziente: "))
-                self.n_mod = random.randint(1, 3)
 
             except ValueError:
                 print("Inserire un ID valido")
@@ -103,38 +143,62 @@ class ChatBot():
             rospack = rospkg.RosPack()
             pkg_root = rospack.get_path('hri_conversational_agency')
             #print(pkg_root)
-            filepath_chat = os.path.join(pkg_root, 
-                                     'scripts', 
-                                     'BFI_assessment_module_TRIAL2copy.xlsx'
-                                     )
+            # filepath_chat = os.path.join(pkg_root, 
+            #                          'scripts', 
+            #                          'BFI_assessment_module_TRIAL2copy.xlsx'
+            #                          )
         
-            work_space = load_workbook(filename = filepath_chat, data_only=True) #switch with the real path of the excel file
-            #work_space = load_workbook(filename = "BFI assessment module TRIAL2copy.xlsx", data_only=True)        
+            # work_space = load_workbook(filename = filepath_chat, data_only=True) #switch with the real path of the excel file
+            self.work_space = load_workbook(filename = self.filename, data_only=True)        
             #work_space = load_workbook(filename = "test.xlsx", data_only=True)
-            pers_data = work_space["Preprocessed_Data"]
-            col = pers_data["B"]
+            self.pers_data = self.work_space["Preprocessed_Data"]
+            col = self.pers_data["B"]
             
+            #slide all the rows in the coloum "codice identificativo (ID)"'till finding the inserted ID
             while not self.id_flag:
                 if col[self.slide_col].value == id:
-                    row = pers_data[self.slide_col + 1]
+                    row = self.pers_data[self.slide_col + 1]
+                    self.row = row
                     self.slide_col = 0
                     self.id_flag = True
                 else:
                     self.slide_col += 1
                     self.id_flag = False
 
-            #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
-            #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
-            self.gender = row[7].value.capitalize()
-            self.age = row[8].value
-            self.education = row[9].value
-            self.job = row[10].value
-            self.interests = row[11].value.rstrip(";").rstrip().replace(";",", ").lower().capitalize()
-            self.extraversion = row[57].value
-            self.agreeableness = row[59].value
-            self.conscientiousness = row[61].value
-            self.neuroticism = row[63].value
-            self.openness = row[65].value
+            if(row[66].value is None or row[66].value == ""):
+                self.randomization(1, 3, 3, 3, row[66].coordinate, row[68].coordinate, row[70].coordinate) #randomization generation and writing of the trials on the excel file
+            
+            if(row[67].value is None or row[67].value == ""):
+                self.curr_mod = str(row[66].value).split("\n")[0] #first modality
+                self.curr_media = str(row[66].value).split("\n")[1] #first media
+                self.curr_trial = 1
+            elif(row[69].value is None or row[69].value == ""):
+                self.curr_mod = str(row[68].value).split("\n")[0] #secont modality
+                self.curr_media = str(row[68].value).split("\n")[1] #second media
+                self.curr_trial = 2    
+            elif(row[71].value is None or row[71].value == ""):
+                self.curr_mod = str(row[70].value).split("\n")[0] #third modality
+                self.curr_media = str(row[70].value).split("\n")[1] #third media
+                self.curr_trial = 3
+            else:
+                    print("Il paziente ha eseguito tutti i trials")
+                    return                          
+
+            if(self.curr_mod == "P_LLM"):
+                #skip if not P_LLM       
+                #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
+                #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
+                self.gender = row[7].value.capitalize()
+                self.age = row[8].value
+                self.education = row[9].value
+                self.job = row[10].value
+                self.interests = row[11].value.rstrip(";").rstrip().replace(";",", ").lower().capitalize()
+                self.extraversion = row[57].value
+                self.agreeableness = row[59].value
+                self.conscientiousness = row[61].value
+                self.neuroticism = row[63].value
+                self.openness = row[65].value
+            
             self.init_flag = True
             #self.state = "idle"
             self.state = "dummy"
@@ -142,6 +206,23 @@ class ChatBot():
             self.dummy()
 
     def dummy(self):
+        #remove after checking if it work
+        if(self.curr_trial == 1):
+            self.pers_data[str(self.row[67].coordinate)] = "DONE"
+            print(self.curr_trial)
+            self.work_space.save(filename = self.filename)
+            return
+        elif(self.curr_trial == 2):
+            self.pers_data[str(self.row[69].coordinate)] = "DONE"
+            print(self.curr_trial)
+            self.work_space.save(filename = self.filename)
+            return
+        elif(self.curr_trial == 3):
+            self.pers_data[str(self.row[71].coordinate)] = "DONE"
+            print(self.curr_trial)
+            self.work_space.save(filename = self.filename)
+            return
+
         if self.state == "dummy" and not self.dummy_flag:
             print("PHASE: DUMMY_CONVERSATION\n")
             self.state = "talk"
@@ -244,7 +325,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(10)
     try:
         #cb.idle()
-        cb.init_timer(15)
+        cb.init_timer(1)
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')
