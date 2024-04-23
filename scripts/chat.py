@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 ''' This script is a template to develop your own node implementing a conversational agent. One should override listen and talk methods to define custom behavior.
 '''
@@ -23,6 +23,7 @@ class ChatBot():
         idle
         listen
         talk
+        play_media
         '''
 
 
@@ -50,9 +51,14 @@ class ChatBot():
                                         String,
                                         self.r_listen_cb
                                         )
+        
         self.chat_timer_sub = rospy.Subscriber('check/init_timer', 
                                                   String, 
                                                   self.chat_timer_cb)
+
+        self.conv_timer_sub = rospy.Subscriber('check/conv_timer', 
+                                                  String, 
+                                                  self.end_timer_cb)
 
         # publisher relative to the robot
         self.r_res_pub = rospy.Publisher('r_response',
@@ -64,7 +70,11 @@ class ChatBot():
                                         String, 
                                         queue_size=1
                                         )
-
+        
+        self.conv_timer_pb = rospy.Publisher('check/conv_timer',  #forse non serve
+                                        String, 
+                                        queue_size=1
+                                        )
         self.slide_col = 0
         self.init_flag = False
         self.dummy_flag = False
@@ -74,6 +84,7 @@ class ChatBot():
         self.r_talk_flag = False
         self.id_flag = False
         self.chat_init_timer_flag = True
+        #self.end_timer_flag = False
 
         #randomization
         self.exc_n = set()
@@ -82,9 +93,10 @@ class ChatBot():
         self.media = ["M", "V", "AL"]
         self.trials = [[], [], []]
 
-        self.curr_mod = ""
-        self.curr_media = ""
-        self.curr_trial = 0
+        #inizializzare in chatter
+        #self.curr_mod = ""
+        #self.curr_media = ""
+        #self.curr_trial = 0
 
         self.filename = "BFI_assessment_module_TRIAL2def.xlsx"
 
@@ -103,6 +115,21 @@ class ChatBot():
             #print("Initialization completed")
             rospy.sleep(1)
             self.setup()
+
+    def conv_timer(self, duration): #to count in s the duration of the actual conversation
+        rospy.Timer(rospy.Duration(duration), self.conv_timer_cb, oneshot=True)
+        #print("The conversation is done")
+
+    def conv_timer_cb(self, event):
+        self.conv_timer_string = String()
+        self.conv_timer_string.data = "True"
+        self.conv_timer_pb.publish(self.conv_timer_string)
+
+    def end_timer_cb(self, end_chat):
+        if(end_chat.data == "False"):
+            self.ai_chatter.end_timer_flag = True #to be checked to see if the conversation is done
+            #print("Initialization completed")
+
 
     def randomization(self, n1, n2, n_max, n_trials, trial1, trial2, trial3):   
         for trial in range(n_trials):
@@ -141,7 +168,7 @@ class ChatBot():
                 print("Inserire un ID valido")
             
             rospack = rospkg.RosPack()
-            pkg_root = rospack.get_path('hri_conversational_agency')
+            #pkg_root = rospack.get_path('hri_conversational_agency')
             #print(pkg_root)
             # filepath_chat = os.path.join(pkg_root, 
             #                          'scripts', 
@@ -169,22 +196,22 @@ class ChatBot():
                 self.randomization(1, 3, 3, 3, row[66].coordinate, row[68].coordinate, row[70].coordinate) #randomization generation and writing of the trials on the excel file
             
             if(row[67].value is None or row[67].value == ""):
-                self.curr_mod = str(row[66].value).split("\n")[0] #first modality
-                self.curr_media = str(row[66].value).split("\n")[1] #first media
-                self.curr_trial = 1
+                self.ai_chatter.curr_mod = str(row[66].value).split("\n")[0] #first modality
+                self.ai_chatter.curr_media = str(row[66].value).split("\n")[1] #first media
+                self.ai_chatter.curr_trial = 1
             elif(row[69].value is None or row[69].value == ""):
-                self.curr_mod = str(row[68].value).split("\n")[0] #secont modality
-                self.curr_media = str(row[68].value).split("\n")[1] #second media
-                self.curr_trial = 2    
+                self.ai_chatter.curr_mod = str(row[68].value).split("\n")[0] #secont modality
+                self.ai_chatter.curr_media = str(row[68].value).split("\n")[1] #second media
+                self.ai_chatter.curr_trial = 2    
             elif(row[71].value is None or row[71].value == ""):
-                self.curr_mod = str(row[70].value).split("\n")[0] #third modality
-                self.curr_media = str(row[70].value).split("\n")[1] #third media
-                self.curr_trial = 3
+                self.ai_chatter.curr_mod = str(row[70].value).split("\n")[0] #third modality
+                self.ai_chatter.curr_media = str(row[70].value).split("\n")[1] #third media
+                self.ai_chatter.curr_trial = 3
             else:
                     print("Il paziente ha eseguito tutti i trials")
                     return                          
 
-            if(self.curr_mod == "P_LLM"):
+            if(self.ai_chatter.curr_mod == "P_LLM"):
                 #skip if not P_LLM       
                 #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
                 #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
@@ -207,19 +234,19 @@ class ChatBot():
 
     def dummy(self):
         #remove after checking if it work
-        if(self.curr_trial == 1):
+        if(self.ai_chatter.curr_trial == 1):
             self.pers_data[str(self.row[67].coordinate)] = "DONE"
-            print(self.curr_trial)
+            print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
             return
-        elif(self.curr_trial == 2):
+        elif(self.ai_chatter.curr_trial == 2):
             self.pers_data[str(self.row[69].coordinate)] = "DONE"
-            print(self.curr_trial)
+            print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
             return
-        elif(self.curr_trial == 3):
+        elif(self.ai_chatter.curr_trial == 3):
             self.pers_data[str(self.row[71].coordinate)] = "DONE"
-            print(self.curr_trial)
+            print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
             return
 
@@ -230,16 +257,14 @@ class ChatBot():
             self.r_talk("")
             #During the first dummy interction the whisper_node must not publish anything
 
-
     def idle(self):
         if self.state == "idle" and not self.idle_flag:
             print("PHASE: IDLE\n")
             self.timer = MyTimer()
+            self.conv_timer(self, 20) #in [s]
             self.state = "listen"
             self.idle_flag = True
             
-        
-
     def h_listen_cb(self, msg):
         print("PHASE: HUMAN_LISTEN\n")
         if(msg.data=="flag" and self.state=="listen"):
@@ -267,6 +292,9 @@ class ChatBot():
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
         
         if(self.real_conv):
+            if(self.ai_chatter.play_media_flag):
+                self.state = "play_media"
+                self.media_player() ##########################add method media_player
             #decidere se generare il prompt con il setup oppure con la generazione della risposta
             self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
             
@@ -276,6 +304,8 @@ class ChatBot():
                 self.r_listen_flag = False
             #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
             r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
+
+
             self.ai_chatter.conversational_hystory(h_prompt, r_ans)
             self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions) #
             self.ai_chatter.log.log_input(h_prompt)
@@ -307,7 +337,20 @@ class ChatBot():
         # r_msg.data = "flag"
         # self.r_res_pub.publish(r_msg)
         # r_msg.data = ""
-        # self.state = "listen"    
+        # self.state = "listen"
+
+    def media_player(self):
+        if(self.state == "play_media"):
+            if(self.ai_chatter.curr_media == "M"):
+                self.r_sound.r_say("Riproduco musica")
+            elif(self.ai_chatter.curr_media == "V"):
+                self.r_sound.r_say("Mostro un video")
+            elif(self.ai_chatter.curr_media == "AL"):
+                self.r_sound.r_say("Riproduco un audiolibro")
+            rospy.sleep(1) #wait for some seconds
+            print("TRIAL DONE")
+
+        #check the media that has to be played
 
 if __name__ == "__main__":
     rospy.init_node('chatbot')

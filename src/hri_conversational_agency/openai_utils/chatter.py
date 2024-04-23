@@ -2,7 +2,7 @@
 
 from openai import OpenAI
 
-from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE
+from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_END_TEMPLATE, MEDIA_PROPOSAL_PROMPT
 from hri_conversational_agency.openai_utils.logger import ChatLogger
 
 import json
@@ -12,6 +12,13 @@ class OpenAIChatter():
         self.log = ChatLogger()
         self.client = OpenAI()
         self.log.log_open()
+        self.end_timer_flag = False
+        self.play_media_flag = False
+
+        self.curr_mod = ""
+        self.curr_media = ""
+        self.curr_trial = 0
+
         self.messages = []
         self.conversation = {}
         self.n_interactions = 0
@@ -32,17 +39,34 @@ class OpenAIChatter():
 
     def generate_s_prompt(self, n_mod, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
         n_mod = 4 #to test a predefined prompt
-        if(n_mod == 1):
-            self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-            self.log.log_system_prompt(self.s_prompt)
-            #print(self.s_prompt)
+        if(self.curr_mod == "P_LLM"):
+            if(not self.play_media_flag): #check
+                if(not self.end_timer_flag):
+                    self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+                    self.log.log_system_prompt(self.s_prompt)
+                elif(self.end_timer_flag):
+                    self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+                    self.log.log_system_prompt(self.s_prompt)
+                    self.play_media_flag = True
+            elif(self.play_media_flag):
+                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format()###mettere lista dei media
+                self.log.log_system_prompt(self.s_prompt)
 
-        elif(n_mod == 2):
-            self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-            self.log.log_system_prompt(self.s_prompt)
-            #print(self.s_prompt)
 
-        elif(n_mod == 3):
+##############fare come sopra
+        elif(self.curr_mod == "LLM"):
+
+
+                if(not self.end_timer_flag):
+                    self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
+                    self.log.log_system_prompt(self.s_prompt)
+                elif(self.end_timer_flag):
+                    self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
+                    self.log.log_system_prompt(self.s_prompt)
+                    self.play_media_flag = True
+                #print(self.s_prompt)
+
+        elif(self.curr_mod == "CHATBOT"):
             print("chatbot")
 
         elif(n_mod == 4):
@@ -83,7 +107,10 @@ class OpenAIChatter():
         )
         #DECIDERE SE RITORNARE TUTTO
         self.tot_tokens = self.tot_tokens + response.usage.total_tokens
+        print(self.tot_tokens) #remove after testing
         model_resp = response.choices[0].message.content
         self.messages.append({"role": "assistant", "content": model_resp})
+        if(self.end_timer_flag):
+            model_resp += "Canzone 1, canzone 2 oppure canzone 3"
         return model_resp
     #  #print(completion['choices'][0]['message']['content']+'\n') #NON VA FATTO COSÌ
