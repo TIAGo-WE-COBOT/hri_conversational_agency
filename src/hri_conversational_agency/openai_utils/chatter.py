@@ -2,7 +2,7 @@
 
 from openai import OpenAI
 
-from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_END_TEMPLATE, MEDIA_PROPOSAL_PROMPT
+from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_END_TEMPLATE, MEDIA_PROPOSAL_PROMPT
 from hri_conversational_agency.openai_utils.logger import ChatLogger
 
 import json
@@ -13,6 +13,7 @@ class OpenAIChatter():
         self.client = OpenAI()
         self.log.log_open()
         self.end_timer_flag = False
+        self.check_media_flag = False
         self.play_media_flag = False
 
         self.curr_mod = ""
@@ -23,6 +24,8 @@ class OpenAIChatter():
         self.conversation = {}
         self.n_interactions = 0
         self.tot_tokens = 0
+        self.compl_tokens = 0
+        self.prompt_tokens = 0
         self.model = MODEL
         self.max_tokens = MAX_TOKENS
         self.temperature = TEMPERATURE
@@ -37,42 +40,43 @@ class OpenAIChatter():
                                       self.presence_penalty
                                       )
 
-    def generate_s_prompt(self, n_mod, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
+    def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
         n_mod = 4 #to test a predefined prompt
-        if(self.curr_mod == "P_LLM"):
-            if(not self.play_media_flag): #check
+        if(self.curr_mod == "P_LLM" or self.curr_mod == "CHATBOT"): #after developing the chatbot remove the or
+            if(not self.check_media_flag): #check
                 if(not self.end_timer_flag):
                     self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-                    self.log.log_system_prompt(self.s_prompt)
+                    #self.log.log_system_prompt(self.s_prompt)
                 elif(self.end_timer_flag):
                     self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-                    self.log.log_system_prompt(self.s_prompt)
-                    self.play_media_flag = True
-            elif(self.play_media_flag):
-                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format()###mettere lista dei media
-                self.log.log_system_prompt(self.s_prompt)
+                    #self.log.log_system_prompt(self.s_prompt)
+                    self.check_media_flag = True
+            elif(self.check_media_flag):
+                self.play_media_flag = True
+                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+                #self.log.log_system_prompt(self.s_prompt)
 
-
-##############fare come sopra
-        elif(self.curr_mod == "LLM"):
-
-
+        elif(self.curr_mod == "LLM" or self.curr_mod == "CHATBOT"): #after developing the chatbot remove the or
+            if(not self.check_media_flag):
                 if(not self.end_timer_flag):
                     self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-                    self.log.log_system_prompt(self.s_prompt)
+                    #self.log.log_system_prompt(self.s_prompt)
                 elif(self.end_timer_flag):
                     self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
-                    self.log.log_system_prompt(self.s_prompt)
-                    self.play_media_flag = True
-                #print(self.s_prompt)
+                    #self.log.log_system_prompt(self.s_prompt)
+                    self.check_media_flag = True
+            elif(self.check_media_flag):
+                self.play_media_flag = True
+                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+                #self.log.log_system_prompt(self.s_prompt)
 
-        elif(self.curr_mod == "CHATBOT"):
-            print("chatbot")
+        # elif(self.curr_mod == "CHATBOT"):
+        #     print("chatbot")
 
-        elif(n_mod == 4):
-            self.s_prompt = SYSTEM_PROMPT_TEMPLATE
-            self.log.log_system_prompt(self.s_prompt)
-            #print(self.s_prompt)
+        # elif(n_mod == 4):
+        #     self.s_prompt = SYSTEM_PROMPT_TEMPLATE
+        #     self.log.log_system_prompt(self.s_prompt)
+        #     #print(self.s_prompt)
 
     #methods to add the system prompts, the user messages and the model responses to the dictionary containing all the conversation
     def add_c_s_prompt(self):
@@ -95,22 +99,41 @@ class OpenAIChatter():
             self.messages = [
                 {"role": "system", "content": s_prompt}
             ]
-        self.messages.append({"role": "user", "content": h_prompt})   
-        response = self.client.chat.completions.create(
-            model = self.model,
-            temperature = self.temperature,
-            max_tokens = self.max_tokens,
-            seed = self.seed,
-            frequency_penalty = self.frequency_penalty,
-            presence_penalty = self.presence_penalty,
-            messages = self.messages
-        )
+        self.messages.append({"role": "user", "content": h_prompt})
+        
+        #Trovare modo per cambiare messages in funzione del system prompt
+        if(not self.end_timer_flag): #aggiungo tutti i messaggi al system prompt
+            response = self.client.chat.completions.create(
+                model = self.model,
+                temperature = self.temperature,
+                max_tokens = self.max_tokens,
+                seed = self.seed,
+                frequency_penalty = self.frequency_penalty,
+                presence_penalty = self.presence_penalty,
+                messages = self.messages
+            )
+        elif(self.end_timer_flag or self.check_media_flag):
+            print("generazione ultimo prompt")
+            print([{"role": "system", "content": self.s_prompt}, self.messages[len(self.messages)-1]])
+            response = self.client.chat.completions.create(
+                model = self.model,
+                temperature = self.temperature,
+                max_tokens = self.max_tokens,
+                seed = self.seed,
+                frequency_penalty = self.frequency_penalty,
+                presence_penalty = self.presence_penalty,
+                messages = [{"role": "system", "content": self.s_prompt}, self.messages[len(self.messages)-1]]
+            )
+        
         #DECIDERE SE RITORNARE TUTTO
-        self.tot_tokens = self.tot_tokens + response.usage.total_tokens
+        self.compl_tokens += response.usage.completion_tokens
+        self.prompt_tokens += response.usage.prompt_tokens
+        self.tot_tokens += response.usage.total_tokens
         print(self.tot_tokens) #remove after testing
         model_resp = response.choices[0].message.content
         self.messages.append({"role": "assistant", "content": model_resp})
-        if(self.end_timer_flag):
-            model_resp += "Canzone 1, canzone 2 oppure canzone 3"
+        print(self.messages)
+        if(self.end_timer_flag and not self.play_media_flag):
+            model_resp += " 'Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona'\n" 
         return model_resp
     #  #print(completion['choices'][0]['message']['content']+'\n') #NON VA FATTO COSÌ

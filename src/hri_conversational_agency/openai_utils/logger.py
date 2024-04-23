@@ -36,7 +36,7 @@ class ChatLogger:
 
     #print the sysyem prompt in the log file
     def log_system_prompt(self, s_p_string):
-         self.f.write('SYSTEM PROMPT: {}\n\n\n'.format(s_p_string))
+         self.f.write('SYSTEM PROMPT: {}\n\n'.format(s_p_string))
 
     #print the user input prompt in the log file
     def log_input(self, string):
@@ -44,7 +44,7 @@ class ChatLogger:
 
     #print the response of the model in the log file
     def log_output(self, response, model):
-        self.f.write('{model}: {text}\n\n\n'.format(model = model.upper(),
+        self.f.write('{model}: {text}\n\n'.format(model = model.upper(),
                                                 text = response.strip('\n')
                                               ))
         
@@ -52,8 +52,14 @@ class ChatLogger:
     def log_curr_interaction(self, ni):
         self.f.write('Interaction n.{}:\n'.format(ni))
 
+    def log_input_tokens(self, input_tokens):
+        self.f.write('Total number of input tokens: {} tokens\n'.format(input_tokens))
+
+    def log_output_tokens(self, output_tokens):
+        self.f.write('Total number of output tokens: {} tokens\n'.format(output_tokens))
+
     def log_tot_tokens(self, tot_tokens):
-        self.f.write('Total number of tokens: {} tokens\n'.format(tot_tokens))
+        self.f.write('Total number of tokens: {} tokens\n\n\n'.format(tot_tokens))
 
     #print the number of interactions considering as a complete interaction a question of the human and the corresponding answer of the robot
     def log_n_interactions(self, n):

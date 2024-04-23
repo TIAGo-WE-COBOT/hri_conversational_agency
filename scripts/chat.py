@@ -24,11 +24,12 @@ class ChatBot():
         listen
         talk
         play_media
+        exit
         '''
 
 
-        self.dummy_speech = ["domanda 1", \
-                             "domanda 2"]#, \
+        self.dummy_speech = ["domanda 1"] #, \
+                             #"domanda 2"]#, \
                              #"domanda 3"]
         self.dummy_question = 0
 
@@ -93,10 +94,7 @@ class ChatBot():
         self.media = ["M", "V", "AL"]
         self.trials = [[], [], []]
 
-        #inizializzare in chatter
-        #self.curr_mod = ""
-        #self.curr_media = ""
-        #self.curr_trial = 0
+        self.model_response = ""
 
         self.filename = "BFI_assessment_module_TRIAL2def.xlsx"
 
@@ -112,23 +110,23 @@ class ChatBot():
     def chat_timer_cb(self, timer_chat):
         if(timer_chat.data == "False"):
             self.chat_init_timer_flag = False
-            #print("Initialization completed")
+            print("Initialization completed")
             rospy.sleep(1)
             self.setup()
 
     def conv_timer(self, duration): #to count in s the duration of the actual conversation
         rospy.Timer(rospy.Duration(duration), self.conv_timer_cb, oneshot=True)
-        #print("The conversation is done")
 
     def conv_timer_cb(self, event):
         self.conv_timer_string = String()
         self.conv_timer_string.data = "True"
         self.conv_timer_pb.publish(self.conv_timer_string)
 
+
     def end_timer_cb(self, end_chat):
-        if(end_chat.data == "False"):
+        if(end_chat.data == "True"):
             self.ai_chatter.end_timer_flag = True #to be checked to see if the conversation is done
-            #print("Initialization completed")
+            print("Last interaction")
 
 
     def randomization(self, n1, n2, n_max, n_trials, trial1, trial2, trial3):   
@@ -211,20 +209,20 @@ class ChatBot():
                     print("Il paziente ha eseguito tutti i trials")
                     return                          
 
-            if(self.ai_chatter.curr_mod == "P_LLM"):
+            #if(self.ai_chatter.curr_mod == "P_LLM"):
                 #skip if not P_LLM       
                 #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
                 #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
-                self.gender = row[7].value.capitalize()
-                self.age = row[8].value
-                self.education = row[9].value
-                self.job = row[10].value
-                self.interests = row[11].value.rstrip(";").rstrip().replace(";",", ").lower().capitalize()
-                self.extraversion = row[57].value
-                self.agreeableness = row[59].value
-                self.conscientiousness = row[61].value
-                self.neuroticism = row[63].value
-                self.openness = row[65].value
+            self.gender = row[7].value.capitalize()
+            self.age = row[8].value
+            self.education = row[9].value
+            self.job = row[10].value
+            self.interests = row[11].value.rstrip(";").rstrip().replace(";",", ").lower().capitalize()
+            self.extraversion = row[57].value
+            self.agreeableness = row[59].value
+            self.conscientiousness = row[61].value
+            self.neuroticism = row[63].value
+            self.openness = row[65].value
             
             self.init_flag = True
             #self.state = "idle"
@@ -238,17 +236,17 @@ class ChatBot():
             self.pers_data[str(self.row[67].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
-            return
+            #return
         elif(self.ai_chatter.curr_trial == 2):
             self.pers_data[str(self.row[69].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
-            return
+            #return
         elif(self.ai_chatter.curr_trial == 3):
             self.pers_data[str(self.row[71].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
             self.work_space.save(filename = self.filename)
-            return
+            #return
 
         if self.state == "dummy" and not self.dummy_flag:
             print("PHASE: DUMMY_CONVERSATION\n")
@@ -261,7 +259,7 @@ class ChatBot():
         if self.state == "idle" and not self.idle_flag:
             print("PHASE: IDLE\n")
             self.timer = MyTimer()
-            self.conv_timer(self, 20) #in [s]
+            self.conv_timer(60) #in [s]
             self.state = "listen"
             self.idle_flag = True
             
@@ -292,31 +290,51 @@ class ChatBot():
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
         
         if(self.real_conv):
-            if(self.ai_chatter.play_media_flag):
-                self.state = "play_media"
-                self.media_player() ##########################add method media_player
+            #self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+            #if(self.ai_chatter.play_media_flag):
+            #print("line 303")
+            #self.state = "play_media"
+            #self.media_player() ##########################add method media_player
+            #ad flag???
             #decidere se generare il prompt con il setup oppure con la generazione della risposta
-            self.ai_chatter.generate_s_prompt(self.n_mod, self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+            #self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
             
             if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
                 self.ai_chatter.n_interactions = self.ai_chatter.n_interactions + 1 #
                 self.h_listen_flag = False
                 self.r_listen_flag = False
-            #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
-            r_ans = "Ciao, come stai?" #Use this line to test the system without wasting tokens
 
-
+            self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+            r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
+            self.model_response = r_ans
+            # if(self.ai_chatter.end_timer_flag):
+            #     if(not self.ai_chatter.play_media_flag):
+            #         r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
+            #     else:
+            #          #Use this line to test the system without wasting tokens
+            #         r_ans = "numero 2"
+            # else:
+            #     r_ans = "Ciao, come stai?"
             self.ai_chatter.conversational_hystory(h_prompt, r_ans)
-            self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions) #
+            self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions)
+            self.ai_chatter.log.log_system_prompt(self.ai_chatter.s_prompt)
             self.ai_chatter.log.log_input(h_prompt)
             self.ai_chatter.log.log_output(r_ans, self.ai_chatter.model)
-            self.r_sound.r_say(r_ans)
-            r_msg = String()
-            r_msg.data = "flag"
-            self.r_res_pub.publish(r_msg)
-            r_msg.data = ""
-            self.state = "listen"    
+            self.ai_chatter.log.log_input_tokens(cb.ai_chatter.prompt_tokens)
+            self.ai_chatter.log.log_output_tokens(cb.ai_chatter.compl_tokens)
+            self.ai_chatter.log.log_tot_tokens(cb.ai_chatter.tot_tokens)
 
+            if(not self.ai_chatter.play_media_flag):        
+                self.r_sound.r_say(r_ans)
+                r_msg = String()
+                r_msg.data = "flag"
+                self.r_res_pub.publish(r_msg)
+                r_msg.data = ""
+                self.state = "listen"
+            else:
+                self.state = "play_media"
+                self.media_player() ##########################add method media_player
+                #ad flag???                 
 
         elif(not self.real_conv):
             self.r_sound.r_say(self.dummy_speech[self.dummy_question])
@@ -339,7 +357,7 @@ class ChatBot():
         # r_msg.data = ""
         # self.state = "listen"
 
-    def media_player(self):
+    def media_player(self): #use self.model response
         if(self.state == "play_media"):
             if(self.ai_chatter.curr_media == "M"):
                 self.r_sound.r_say("Riproduco musica")
@@ -347,15 +365,15 @@ class ChatBot():
                 self.r_sound.r_say("Mostro un video")
             elif(self.ai_chatter.curr_media == "AL"):
                 self.r_sound.r_say("Riproduco un audiolibro")
-            rospy.sleep(1) #wait for some seconds
-            print("TRIAL DONE")
 
+            #rospy.sleep(1) #wait for some second
+            print("TRIAL DONE")
+            self.state = "exit"
         #check the media that has to be played
 
 if __name__ == "__main__":
     rospy.init_node('chatbot')
     cb = ChatBot()
-    print(cb.ai_chatter.log.fpath)
     def on_shutdown():
         cb.ai_chatter.log.log_n_interactions(cb.ai_chatter.n_interactions) #
         duration = cb.timer.elapsed_time()
@@ -368,7 +386,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(10)
     try:
         #cb.idle()
-        cb.init_timer(1)
+        cb.init_timer(15)
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')
