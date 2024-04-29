@@ -3,8 +3,9 @@
 ''' This script is a template to develop your own node implementing a conversational agent. One should override listen and talk methods to define custom behavior.
 '''
 from emit_sound import EmitSound
-from timer import MyTimer
+from my_timer import MyTimer
 from hri_conversational_agency.openai_utils.chatter import OpenAIChatter
+from rasa_chat import RasaChatBot
 from openpyxl import Workbook, load_workbook
 import os
 import json
@@ -27,6 +28,7 @@ class ChatBot():
         exit
         '''
 
+        self.tot_duration = 60 #duration of the effective conversation
 
         self.dummy_speech = ["domanda 1"] #, \
                              #"domanda 2"]#, \
@@ -36,6 +38,7 @@ class ChatBot():
         self.real_conv = False #to switch betw the dummy and the real conversation
         # Initialize the OpenAI model to generate responses 
         self.ai_chatter = OpenAIChatter()
+        self.rasa_chatter = RasaChatBot()
         self.r_sound = EmitSound()
 
         # Listen to the model response
@@ -76,6 +79,12 @@ class ChatBot():
                                         String, 
                                         queue_size=1
                                         )
+        
+        self.play_media_pub = rospy.Publisher('play/media',
+                                             String,
+                                             queue_size=1
+                                             )
+
         self.slide_col = 0
         self.init_flag = False
         self.dummy_flag = False
@@ -195,16 +204,34 @@ class ChatBot():
             
             if(row[67].value is None or row[67].value == ""):
                 self.ai_chatter.curr_mod = str(row[66].value).split("\n")[0] #first modality
+                self.rasa_chatter.rasa_curr_mod = self.ai_chatter.curr_mod
+
                 self.ai_chatter.curr_media = str(row[66].value).split("\n")[1] #first media
+                self.rasa_chatter.rasa_curr_media = self.ai_chatter.curr_media
+
                 self.ai_chatter.curr_trial = 1
+                self.rasa_chatter.rasa_curr_trial = self.ai_chatter.curr_trial
+
             elif(row[69].value is None or row[69].value == ""):
                 self.ai_chatter.curr_mod = str(row[68].value).split("\n")[0] #secont modality
+                self.rasa_chatter.rasa_curr_mod = self.ai_chatter.curr_mod
+
                 self.ai_chatter.curr_media = str(row[68].value).split("\n")[1] #second media
-                self.ai_chatter.curr_trial = 2    
+                self.rasa_chatter.rasa_curr_media = self.ai_chatter.curr_media
+
+                self.ai_chatter.curr_trial = 2
+                self.rasa_chatter.rasa_curr_trial = self.ai_chatter.curr_trial
+
             elif(row[71].value is None or row[71].value == ""):
                 self.ai_chatter.curr_mod = str(row[70].value).split("\n")[0] #third modality
+                self.rasa_chatter.rasa_curr_mod = self.ai_chatter.curr_mod
+
                 self.ai_chatter.curr_media = str(row[70].value).split("\n")[1] #third media
+                self.rasa_chatter.rasa_curr_media = self.ai_chatter.curr_media
+
                 self.ai_chatter.curr_trial = 3
+                self.rasa_chatter.rasa_curr_trial = self.ai_chatter.curr_trial
+
             else:
                     print("Il paziente ha eseguito tutti i trials")
                     return                          
@@ -225,10 +252,14 @@ class ChatBot():
             self.openness = row[65].value
             
             self.init_flag = True
+            if(self.ai_chatter.curr_trial==1): #dummy conversation during the first trial only, check if it work
             #self.state = "idle"
-            self.state = "dummy"
+                self.state = "dummy"
             #self.idle()
-            self.dummy()
+                self.dummy()
+            else:
+                self.state = "idle"
+                self.idle()
 
     def dummy(self):
         #remove after checking if it work
@@ -259,7 +290,7 @@ class ChatBot():
         if self.state == "idle" and not self.idle_flag:
             print("PHASE: IDLE\n")
             self.timer = MyTimer()
-            self.conv_timer(60) #in [s]
+            self.conv_timer(self.tot_duration) #in [s]
             self.state = "listen"
             self.idle_flag = True
             
@@ -290,6 +321,7 @@ class ChatBot():
             raise ValueError("The `r_talk` cb should not be entered when not in state `talk`. How did you get here?!")
         
         if(self.real_conv):
+            print("Real conversation")
             #self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
             #if(self.ai_chatter.play_media_flag):
             #print("line 303")
@@ -298,45 +330,70 @@ class ChatBot():
             #ad flag???
             #decidere se generare il prompt con il setup oppure con la generazione della risposta
             #self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
-            
-            if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
-                self.ai_chatter.n_interactions = self.ai_chatter.n_interactions + 1 #
-                self.h_listen_flag = False
-                self.r_listen_flag = False
+            if(self.ai_chatter.curr_mod == "LLM" or self.ai_chatter.curr_mod == "P_LLM"):
+                if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
+                    self.ai_chatter.n_interactions = self.ai_chatter.n_interactions + 1 #
+                    self.h_listen_flag = False
+                    self.r_listen_flag = False
 
-            self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
-            r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
-            self.model_response = r_ans
-            # if(self.ai_chatter.end_timer_flag):
-            #     if(not self.ai_chatter.play_media_flag):
-            #         r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
-            #     else:
-            #          #Use this line to test the system without wasting tokens
-            #         r_ans = "numero 2"
-            # else:
-            #     r_ans = "Ciao, come stai?"
-            self.ai_chatter.conversational_hystory(h_prompt, r_ans)
-            self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions)
-            self.ai_chatter.log.log_system_prompt(self.ai_chatter.s_prompt)
-            self.ai_chatter.log.log_input(h_prompt)
-            self.ai_chatter.log.log_output(r_ans, self.ai_chatter.model)
-            self.ai_chatter.log.log_input_tokens(cb.ai_chatter.prompt_tokens)
-            self.ai_chatter.log.log_output_tokens(cb.ai_chatter.compl_tokens)
-            self.ai_chatter.log.log_tot_tokens(cb.ai_chatter.tot_tokens)
+                self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
+                #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
+                #self.model_response = r_ans #model
+                if(self.ai_chatter.end_timer_flag):
+                    if(not self.ai_chatter.find_media_flag):
+                        r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
+                    else:
+                         #Use this line to test the system without wasting tokens
+                        r_ans = "2"
+                else:
+                    r_ans = "Ciao, come stai?"
+                self.model_response = r_ans
+                self.ai_chatter.conversational_hystory(h_prompt, r_ans)
+                self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions)
+                self.ai_chatter.log.log_system_prompt(self.ai_chatter.s_prompt)
+                self.ai_chatter.log.log_input(h_prompt)
+                self.ai_chatter.log.log_output(r_ans, self.ai_chatter.model)
+                self.ai_chatter.log.log_input_tokens(cb.ai_chatter.prompt_tokens)
+                self.ai_chatter.log.log_output_tokens(cb.ai_chatter.compl_tokens)
+                self.ai_chatter.log.log_tot_tokens(cb.ai_chatter.tot_tokens)
 
-            if(not self.ai_chatter.play_media_flag):        
-                self.r_sound.r_say(r_ans)
-                r_msg = String()
-                r_msg.data = "flag"
-                self.r_res_pub.publish(r_msg)
-                r_msg.data = ""
-                self.state = "listen"
-            else:
-                self.state = "play_media"
-                self.media_player() ##########################add method media_player
-                #ad flag???                 
+                if(not self.ai_chatter.play_media_flag):        
+                    self.r_sound.r_say(r_ans)
+                    r_msg = String()
+                    r_msg.data = "flag"
+                    self.r_res_pub.publish(r_msg)
+                    r_msg.data = ""
+                    self.state = "listen"
+                else:
+                    self.state = "play_media"
+                    self.media_player() ##########################add method media_player
+                 
+            elif(self.ai_chatter.curr_mod == "CHATBOT"):
+                if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
+                    self.rasa_chatter.rasa_interaction += 1 
+                    self.h_listen_flag = False
+                    self.r_listen_flag = False
+                
+                #togliere questo if e mettere if in rasa chatter
+
+                self.rasa_chatter.send_request(h_prompt)
+                print(self.rasa_chatter.chatbot_resp)
+                ###mettere i log come per llm e pllm, bisogna aggiungere metodi nello script rasa_chat
+
+                ######################################################################################
+                if(not self.rasa_chatter.rasa_play_media_flag):    
+                    self.r_sound.r_say(self.rasa_chatter.chatbot_resp)
+                    chatbot_msg = String()
+                    chatbot_msg.data = "flag"
+                    self.r_res_pub.publish(chatbot_msg)
+                    chatbot_msg.data = ""
+                    self.state = "listen"
+                else:
+                    self.state = "play_media"
+                    self.media_player() ##########################add method media_player
 
         elif(not self.real_conv):
+        #dummy conversation during the first trial only, check if it work
             self.r_sound.r_say(self.dummy_speech[self.dummy_question])
             self.dummy_question += 1
             r_msg = String()
@@ -350,7 +407,6 @@ class ChatBot():
                 self.r_res_pub.publish(r_msg)
                 self.state = "idle"
                 self.idle()
-
         # r_msg = String()
         # r_msg.data = "flag"
         # self.r_res_pub.publish(r_msg)
@@ -358,13 +414,23 @@ class ChatBot():
         # self.state = "listen"
 
     def media_player(self): #use self.model response
-        if(self.state == "play_media"):
-            if(self.ai_chatter.curr_media == "M"):
+        if(self.state == "send_media"):
+            media = String()
+            if(self.ai_chatter.curr_media == "M" or self.rasa_chatter.rasa_curr_media == "M"):
                 self.r_sound.r_say("Riproduco musica")
-            elif(self.ai_chatter.curr_media == "V"):
+                data = 'M'+'%'+'musica da riprodurre'
+                media.data = data
+                self.play_media_pub.publish(media)
+            elif(self.ai_chatter.curr_media == "V" or self.rasa_chatter.rasa_curr_media == "V"):
                 self.r_sound.r_say("Mostro un video")
-            elif(self.ai_chatter.curr_media == "AL"):
+                data = 'V'+'%'+'video da riprodurre'
+                media.data = data
+                self.play_media_pub.publish(media)
+            elif(self.ai_chatter.curr_media == "AL" or self.rasa_chatter.rasa_curr_media == "AL"):
                 self.r_sound.r_say("Riproduco un audiolibro")
+                data = 'AL'+'%'+'audiolibro da riprodurre'
+                media.data = data
+                self.play_media_pub.publish(media)
 
             #rospy.sleep(1) #wait for some second
             print("TRIAL DONE")
@@ -386,7 +452,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(10)
     try:
         #cb.idle()
-        cb.init_timer(15)
+        cb.init_timer(3)
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')

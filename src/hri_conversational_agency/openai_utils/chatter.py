@@ -2,8 +2,11 @@
 
 from openai import OpenAI
 
-from hri_conversational_agency.openai_utils.cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_END_TEMPLATE, MEDIA_PROPOSAL_PROMPT
-from hri_conversational_agency.openai_utils.logger import ChatLogger
+from .cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, \
+                            PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, \
+                            STD_SYSTEM_PROMPT_END_TEMPLATE, MUSIC_PROPOSAL_PROMPT, VIDEO_PROPOSAL_PROMPT, AUDIOLIBRO_PROPOSAL_PROMPT
+
+from .logger import ChatLogger
 
 import json
 
@@ -15,10 +18,12 @@ class OpenAIChatter():
         self.end_timer_flag = False
         self.check_media_flag = False
         self.play_media_flag = False
+        self.find_media_flag = False
 
         self.curr_mod = ""
         self.curr_media = ""
         self.curr_trial = 0
+        self.media_list = ["1", "2", "3", "4", "5"]
 
         self.messages = []
         self.conversation = {}
@@ -39,44 +44,80 @@ class OpenAIChatter():
                                       self.frequency_penalty,
                                       self.presence_penalty
                                       )
+    ###POSSIBILE RIORGANIZZAZIONE DEL CODICE
+    # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
+    #     n_mod = 4 #to test a predefined prompt
+    #     if(self.curr_mod == "P_LLM"):
+    #         if(not self.check_media_flag): #check
+    #             if(not self.end_timer_flag):
+    #                 self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+    #                 #self.log.log_system_prompt(self.s_prompt)
+    #             elif(self.end_timer_flag):
+    #                 self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+    #                 #self.log.log_system_prompt(self.s_prompt)
+    #                 self.check_media_flag = True
+    #         elif(self.check_media_flag):
+    #             self.play_media_flag = True
+    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+    #             #self.log.log_system_prompt(self.s_prompt)
 
-    def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
-        n_mod = 4 #to test a predefined prompt
-        if(self.curr_mod == "P_LLM" or self.curr_mod == "CHATBOT"): #after developing the chatbot remove the or
-            if(not self.check_media_flag): #check
-                if(not self.end_timer_flag):
+    #     elif(self.curr_mod == "LLM"):
+    #         if(not self.check_media_flag):
+    #             if(not self.end_timer_flag):
+    #                 self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
+    #                 #self.log.log_system_prompt(self.s_prompt)
+    #             elif(self.end_timer_flag):
+    #                 self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
+    #                 #self.log.log_system_prompt(self.s_prompt)
+    #                 self.check_media_flag = True
+    #         elif(self.check_media_flag):
+    #             self.play_media_flag = True
+    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+    #             #self.log.log_system_prompt(self.s_prompt)
+
+    ###CODICE RIORGANIZZATO, DA TESTARE, POSSIBILE ULTERIORE RIORGANIZZAZIONE
+    # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
+    #         if(not self.check_media_flag): #check
+    #             if(not self.end_timer_flag):
+    #                 if(self.curr_mod == "P_LLM"):
+    #                     self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+    #                 elif(self.curr_mod == "LLM"):
+    #                     self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
+    #             elif(self.end_timer_flag):
+    #                 if(self.curr_mod == "P_LLM"):
+    #                     self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+    #                 elif(self.curr_mod == "LLM"):
+    #                     self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
+    #                 self.check_media_flag = True
+    #         elif(self.check_media_flag):
+    #             self.play_media_flag = True
+    #             #mettere le tre condizioni a seconda del media
+    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+
+    ###CODICE RIORGANIZZATO 2, DA TESTARE
+    def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
+             #check
+            if(not self.end_timer_flag):
+                if(self.curr_mod == "P_LLM"):
                     self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-                    #self.log.log_system_prompt(self.s_prompt)
-                elif(self.end_timer_flag):
-                    self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-                    #self.log.log_system_prompt(self.s_prompt)
-                    self.check_media_flag = True
-            elif(self.check_media_flag):
-                self.play_media_flag = True
-                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-                #self.log.log_system_prompt(self.s_prompt)
-
-        elif(self.curr_mod == "LLM" or self.curr_mod == "CHATBOT"): #after developing the chatbot remove the or
-            if(not self.check_media_flag):
-                if(not self.end_timer_flag):
+                elif(self.curr_mod == "LLM"):
                     self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-                    #self.log.log_system_prompt(self.s_prompt)
-                elif(self.end_timer_flag):
-                    self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
-                    #self.log.log_system_prompt(self.s_prompt)
+            elif(self.end_timer_flag):
+                if(not self.check_media_flag):
+                    if(self.curr_mod == "P_LLM"):
+                        self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+                    elif(self.curr_mod == "LLM"):
+                        self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
                     self.check_media_flag = True
-            elif(self.check_media_flag):
-                self.play_media_flag = True
-                self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-                #self.log.log_system_prompt(self.s_prompt)
-
-        # elif(self.curr_mod == "CHATBOT"):
-        #     print("chatbot")
-
-        # elif(n_mod == 4):
-        #     self.s_prompt = SYSTEM_PROMPT_TEMPLATE
-        #     self.log.log_system_prompt(self.s_prompt)
-        #     #print(self.s_prompt)
+                elif(self.check_media_flag):
+                    if(self.curr_media == "M"):
+                        self.s_prompt = MUSIC_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+                    elif(self.curr_media == "V"):
+                        self.s_prompt = VIDEO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista video
+                    elif(self.curr_media == "AL"):
+                        self.s_prompt = AUDIOLIBRO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista audiolibro
+                    self.find_media_flag = True #probabilmente è meglio metterla dopo check associazione media-risposta
+    
 
     #methods to add the system prompts, the user messages and the model responses to the dictionary containing all the conversation
     def add_c_s_prompt(self):
@@ -133,7 +174,12 @@ class OpenAIChatter():
         model_resp = response.choices[0].message.content
         self.messages.append({"role": "assistant", "content": model_resp})
         print(self.messages)
-        if(self.end_timer_flag and not self.play_media_flag):
-            model_resp += " 'Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona'\n" 
+
+        if(self.end_timer_flag and not self.find_media_flag): #forse mettere lista direttamente in prompt
+            model_resp += " 'Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona'\n"
+        elif(self.end_timer_flag and self.find_media_flag): #DA TESTARE
+            if(model_resp in self.media_list):
+                self.play_media_flag = True
+         
         return model_resp
     #  #print(completion['choices'][0]['message']['content']+'\n') #NON VA FATTO COSÌ

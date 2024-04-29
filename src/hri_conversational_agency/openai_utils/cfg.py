@@ -56,7 +56,23 @@ Tratti della personalità:\n \
     Nevroticismo: {:.0%};\n \
     Apertura mentale: {:.0%}."
 
-MEDIA_PROPOSAL_PROMPT = "Determina il numero corrispondente all'input nella lista di canzoni fornita tra []. L'input della persona proviene da un sistema di trascrizione del parlato e potrebbe risultare non accurato, se non riesci a comprendere l'input, scusati e chiedi di ripetere l'input. Rispondi soltanto con il numero.\n\n \
+MUSIC_PROPOSAL_PROMPT = "Determina il numero corrispondente all'input nella lista di canzoni fornita tra []. L'input della persona proviene da un sistema di trascrizione del parlato e potrebbe risultare non accurato, se non riesci a comprendere l'input, scusati e chiedi di ripetere la scelta. Rispondi soltanto con il numero.\n\n \
+Lista esempio: ['cane', 'casa', 'gatto']\n \
+    Input: 'cane'\n \
+    Risposta: 1\n\n \
+    Input: 'casa'\n \
+    Risposta: 2\n\n \
+Lista: {}"
+
+VIDEO_PROPOSAL_PROMPT = "Determina il numero corrispondente all'input nella lista di video fornita tra []. L'input della persona proviene da un sistema di trascrizione del parlato e potrebbe risultare non accurato, se non riesci a comprendere l'input, scusati e chiedi di ripetere la scelta. Rispondi soltanto con il numero.\n\n \
+Lista esempio: ['cane', 'casa', 'gatto']\n \
+    Input: 'cane'\n \
+    Risposta: 1\n\n \
+    Input: 'casa'\n \
+    Risposta: 2\n\n \
+Lista: {}"
+
+AUDIOLIBRO_PROPOSAL_PROMPT = "Determina il numero corrispondente all'input nella lista di audiolibri fornita tra []. L'input della persona proviene da un sistema di trascrizione del parlato e potrebbe risultare non accurato, se non riesci a comprendere l'input, scusati e chiedi di ripetere la scelta. Rispondi soltanto con il numero.\n\n \
 Lista esempio: ['cane', 'casa', 'gatto']\n \
     Input: 'cane'\n \
     Risposta: 1\n\n \
