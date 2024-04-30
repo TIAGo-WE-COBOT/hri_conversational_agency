@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import cv2
-import numpy as np
+# import cv2
+# import numpy as np
 import time
 ###DA IMPORTARE SU MEDIAPLAYER
 
@@ -51,15 +51,19 @@ import time
 # # Chiamata alla funzione per riprodurre l'audio
 # riproduci_audio(path_to_audio)
 
-m = [
-    {"role": "system", "content": "a"},
-    {"role": "user", "content": "b"},
-    {"role": "assistant", "content": "c"},
-    {"role": "user", "content": "d"}
-  ]
+# m = [
+#     {"role": "system", "content": "a"},
+#     {"role": "user", "content": "b"},
+#     {"role": "assistant", "content": "c"},
+#     {"role": "user", "content": "d"}
+#   ]
 
-n=1
-while(n!=3):
-    messages = m[-n]
-    print(messages)
-    n += 1
+# n=0
+# while(n!=(len(m)-1)):
+#     messages = [{"role": "system", "content": "a"}] + m[(len(m)-(n+1)):]
+#     print(messages)
+#     n += 1
+
+L = ["1", "2"]
+c = "ciao: {}".format(L)
+print(c)

@@ -33,7 +33,7 @@ class ChatBot():
         exit
         '''
 
-        self.tot_duration = 30 #duration of the effective conversation
+        self.tot_duration = 10 #duration of the effective conversation
 
         self.dummy_speech = ["domanda 1"] #, \
                              #"domanda 2"]#, \
@@ -276,21 +276,21 @@ class ChatBot():
 
     def dummy(self):
         #remove after checking if it work
-        if(self.ai_chatter.curr_trial == 1):
-            self.pers_data[str(self.row[67].coordinate)] = "DONE"
-            print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.profiles_file)
-            #return
-        elif(self.ai_chatter.curr_trial == 2):
-            self.pers_data[str(self.row[69].coordinate)] = "DONE"
-            print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.profiles_file)
-            #return
-        elif(self.ai_chatter.curr_trial == 3):
-            self.pers_data[str(self.row[71].coordinate)] = "DONE"
-            print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.profiles_file)
-            #return
+        # if(self.ai_chatter.curr_trial == 1):
+        #     self.pers_data[str(self.row[67].coordinate)] = "DONE"
+        #     print(self.ai_chatter.curr_trial)
+        #     self.work_space.save(filename = self.profiles_file)
+        #     #return
+        # elif(self.ai_chatter.curr_trial == 2):
+        #     self.pers_data[str(self.row[69].coordinate)] = "DONE"
+        #     print(self.ai_chatter.curr_trial)
+        #     self.work_space.save(filename = self.profiles_file)
+        #     #return
+        # elif(self.ai_chatter.curr_trial == 3):
+        #     self.pers_data[str(self.row[71].coordinate)] = "DONE"
+        #     print(self.ai_chatter.curr_trial)
+        #     self.work_space.save(filename = self.profiles_file)
+        #     #return
 
         if self.state == "dummy" and not self.dummy_flag:
             print("PHASE: DUMMY_CONVERSATION\n")
@@ -353,15 +353,14 @@ class ChatBot():
                 print(self.ai_chatter.s_prompt)
                 r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
                 self.model_response = r_ans #model
-                # if(self.ai_chatter.end_timer_flag):
+                # if(self.ai_chatter.end_timer_flag): #Use these lines to test the system without wasting tokens
                 #     if(not self.ai_chatter.find_media_flag):
                 #         r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
-                #     else:
-                #          #Use this line to test the system without wasting tokens
+                #     else:          
                 #         r_ans = "2"
                 # else:
                 #     r_ans = "Ciao, come stai?"
-                # self.model_response = r_ans
+                self.model_response = r_ans
                 self.ai_chatter.conversational_hystory(h_prompt, r_ans)
                 self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions)
                 self.ai_chatter.log.log_system_prompt(self.ai_chatter.s_prompt)
@@ -379,6 +378,8 @@ class ChatBot():
                     r_msg.data = ""
                     self.state = "listen"
                 else:
+                    media_chioce = "Ottimo! Riproduco: " + r_ans
+                    self.r_sound.r_say(media_chioce)
                     self.state = "send_media"
                     self.send_media() ##########################add method media_player
                  

@@ -3,8 +3,9 @@
 from openai import OpenAI
 
 from .cfg import OPENAI_API_KEY, MODEL, MAX_TOKENS, TEMPERATURE, SEED, FREQUENCY_PENALTY, PRESENCE_PENALTY, \
-                            PERS_SYSTEM_PROMPT_TEMPLATE, PERS_SYSTEM_PROMPT_END_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, \
-                            STD_SYSTEM_PROMPT_END_TEMPLATE, MUSIC_PROPOSAL_PROMPT, VIDEO_PROPOSAL_PROMPT, AUDIOLIBRO_PROPOSAL_PROMPT
+                            PERS_SYSTEM_PROMPT_TEMPLATE, STD_SYSTEM_PROMPT_TEMPLATE, \
+                            PERS_SYSTEM_PROMPT_END_M_TEMPLATE, PERS_SYSTEM_PROMPT_END_V_TEMPLATE, PERS_SYSTEM_PROMPT_END_AL_TEMPLATE, \
+                            STD_SYSTEM_PROMPT_END_M_TEMPLATE, STD_SYSTEM_PROMPT_END_V_TEMPLATE, STD_SYSTEM_PROMPT_END_AL_TEMPLATE
 
 from .logger import ChatLogger
 
@@ -24,7 +25,10 @@ class OpenAIChatter():
         self.curr_mod = ""
         self.curr_media = ""
         self.curr_trial = 0
-        self.media_list = ['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']
+        self.media_list = []
+        self.music_list = ['bad Romance', 'closer', 'pamplona']
+        self.video_list = ['video film azione', 'video film romantico', 'documentario']
+        self.audiolibro_list = ['il piccolo principe', 'sherlock holmes', 'la coscienza di zeno']
 
         self.messages = []
         self.conversation = {}
@@ -129,9 +133,22 @@ class OpenAIChatter():
             elif(self.end_timer_flag):
                 if(not self.check_media_flag):
                     if(self.curr_mod == "P_LLM"):
-                        self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+                        #self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
+                        if(self.curr_media == "M"):
+                            self.s_prompt = PERS_SYSTEM_PROMPT_END_M_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)###mettere lista dei media
+                        elif(self.curr_media == "V"):
+                            self.s_prompt = PERS_SYSTEM_PROMPT_END_V_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)###mettere lista video
+                        elif(self.curr_media == "AL"):
+                            self.s_prompt = PERS_SYSTEM_PROMPT_END_AL_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)###mettere lista audiolibro
+
                     elif(self.curr_mod == "LLM"):
-                        self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
+                        #self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
+                        if(self.curr_media == "M"):
+                            self.s_prompt = STD_SYSTEM_PROMPT_END_M_TEMPLATE###mettere lista dei media
+                        elif(self.curr_media == "V"):
+                            self.s_prompt = STD_SYSTEM_PROMPT_END_V_TEMPLATE###mettere lista video
+                        elif(self.curr_media == "AL"):
+                            self.s_prompt = STD_SYSTEM_PROMPT_END_AL_TEMPLATE###mettere lista audiolibro
                     #self.check_media_flag = True
                 # elif(self.check_media_flag):
                 #     if(self.curr_media == "M"):
@@ -178,8 +195,10 @@ class OpenAIChatter():
                 messages = self.messages
             )
         elif(self.end_timer_flag):
-            #print("generazione ultimo prompt")
-            #print([{"role": "system", "content": self.s_prompt}, self.messages[len(self.messages)-1]])
+            n = 0
+            print("generazione ultimo prompt")
+            print([{"role": "system", "content": self.s_prompt}] + self.messages[(len(self.messages)-(n+1)):])
+            
             response = self.client.chat.completions.create(
                 model = self.model,
                 temperature = self.temperature,
@@ -187,8 +206,10 @@ class OpenAIChatter():
                 seed = self.seed,
                 frequency_penalty = self.frequency_penalty,
                 presence_penalty = self.presence_penalty,
-                messages = [{"role": "system", "content": self.s_prompt}, self.messages[len(self.messages)-1]]
+                # messages = [{"role": "system", "content": self.s_prompt}, self.messages[len(self.messages)-1]] #OLD
+                messages = [{"role": "system", "content": self.s_prompt}] + self.messages[(len(self.messages)-(n+1)):]
             )
+            n += 1
         
         #DECIDERE SE RITORNARE TUTTO
         self.compl_tokens += response.usage.completion_tokens
@@ -201,8 +222,16 @@ class OpenAIChatter():
 
         if(self.end_timer_flag):
             print(model_resp) #DA TESTARE
-            media = model_resp.strip("/n") #In some cases the model adds "\n"
-            if(media in self.media_list):
+
+            model_resp = model_resp.lower().strip("#") #In some cases the model adds "\n"
+            if(self.curr_media == "M"):
+                self.media_list = self.music_list
+            if(self.curr_media == "V"):
+                self.media_list = self.video_list
+            if(self.curr_media == "AL"):
+                self.media_list = self.audiolibro_list
+
+            if(model_resp in self.media_list):
                 self.play_media_flag = True
             else:
                 print("eh no no")
