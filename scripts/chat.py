@@ -24,11 +24,12 @@ class ChatBot():
         idle
         listen
         talk
-        play_media
+        send_media
+        greet
         exit
         '''
 
-        self.tot_duration = 60 #duration of the effective conversation
+        self.tot_duration = 30 #duration of the effective conversation
 
         self.dummy_speech = ["domanda 1"] #, \
                              #"domanda 2"]#, \
@@ -63,6 +64,10 @@ class ChatBot():
         self.conv_timer_sub = rospy.Subscriber('check/conv_timer', 
                                                   String, 
                                                   self.end_timer_cb)
+        
+        self.end_media_sub = rospy.Subscriber('end/media',
+                                             String,
+                                             self.greet_cb)
 
         # publisher relative to the robot
         self.r_res_pub = rospy.Publisher('r_response',
@@ -70,12 +75,12 @@ class ChatBot():
                                         queue_size=1
                                         )
         
-        self.timer_pb = rospy.Publisher('check/init_timer', 
+        self.timer_pub = rospy.Publisher('check/init_timer', 
                                         String, 
                                         queue_size=1
                                         )
         
-        self.conv_timer_pb = rospy.Publisher('check/conv_timer',  #forse non serve
+        self.conv_timer_pub = rospy.Publisher('check/conv_timer',  #forse non serve
                                         String, 
                                         queue_size=1
                                         )
@@ -94,7 +99,6 @@ class ChatBot():
         self.r_talk_flag = False
         self.id_flag = False
         self.chat_init_timer_flag = True
-        #self.end_timer_flag = False
 
         #randomization
         self.exc_n = set()
@@ -114,7 +118,7 @@ class ChatBot():
     def init_timer_cb(self, event):
         self.init_timer_string = String()
         self.init_timer_string.data = "False"
-        self.timer_pb.publish(self.init_timer_string)
+        self.timer_pub.publish(self.init_timer_string)
 
     def chat_timer_cb(self, timer_chat):
         if(timer_chat.data == "False"):
@@ -129,7 +133,7 @@ class ChatBot():
     def conv_timer_cb(self, event):
         self.conv_timer_string = String()
         self.conv_timer_string.data = "True"
-        self.conv_timer_pb.publish(self.conv_timer_string)
+        self.conv_timer_pub.publish(self.conv_timer_string)
 
 
     def end_timer_cb(self, end_chat):
@@ -258,7 +262,11 @@ class ChatBot():
             #self.idle()
                 self.dummy()
             else:
+                self.real_conv = True
                 self.state = "idle"
+                r_msg = String()
+                r_msg.data = ""
+                self.r_res_pub.publish(r_msg)
                 self.idle()
 
     def dummy(self):
@@ -337,17 +345,18 @@ class ChatBot():
                     self.r_listen_flag = False
 
                 self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
-                #r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
-                #self.model_response = r_ans #model
-                if(self.ai_chatter.end_timer_flag):
-                    if(not self.ai_chatter.find_media_flag):
-                        r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
-                    else:
-                         #Use this line to test the system without wasting tokens
-                        r_ans = "2"
-                else:
-                    r_ans = "Ciao, come stai?"
-                self.model_response = r_ans
+                print(self.ai_chatter.s_prompt)
+                r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
+                self.model_response = r_ans #model
+                # if(self.ai_chatter.end_timer_flag):
+                #     if(not self.ai_chatter.find_media_flag):
+                #         r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
+                #     else:
+                #          #Use this line to test the system without wasting tokens
+                #         r_ans = "2"
+                # else:
+                #     r_ans = "Ciao, come stai?"
+                # self.model_response = r_ans
                 self.ai_chatter.conversational_hystory(h_prompt, r_ans)
                 self.ai_chatter.log.log_curr_interaction(self.ai_chatter.n_interactions)
                 self.ai_chatter.log.log_system_prompt(self.ai_chatter.s_prompt)
@@ -365,8 +374,8 @@ class ChatBot():
                     r_msg.data = ""
                     self.state = "listen"
                 else:
-                    self.state = "play_media"
-                    self.media_player() ##########################add method media_player
+                    self.state = "send_media"
+                    self.send_media() ##########################add method media_player
                  
             elif(self.ai_chatter.curr_mod == "CHATBOT"):
                 if(self.idle_flag and self.r_listen_flag and self.h_listen_flag):
@@ -389,8 +398,8 @@ class ChatBot():
                     chatbot_msg.data = ""
                     self.state = "listen"
                 else:
-                    self.state = "play_media"
-                    self.media_player() ##########################add method media_player
+                    self.state = "send_media"
+                    self.send_media() ##########################add method media_player
 
         elif(not self.real_conv):
         #dummy conversation during the first trial only, check if it work
@@ -403,9 +412,9 @@ class ChatBot():
             self.state = "listen"
             if(self.dummy_question > (len(self.dummy_speech)-1)):
                 self.real_conv = True
+                self.state = "idle"
                 r_msg.data = ""
                 self.r_res_pub.publish(r_msg)
-                self.state = "idle"
                 self.idle()
         # r_msg = String()
         # r_msg.data = "flag"
@@ -413,8 +422,9 @@ class ChatBot():
         # r_msg.data = ""
         # self.state = "listen"
 
-    def media_player(self): #use self.model response
+    def send_media(self): #use self.model response
         if(self.state == "send_media"):
+            self.state = "greet"
             media = String()
             if(self.ai_chatter.curr_media == "M" or self.rasa_chatter.rasa_curr_media == "M"):
                 self.r_sound.r_say("Riproduco musica")
@@ -434,8 +444,15 @@ class ChatBot():
 
             #rospy.sleep(1) #wait for some second
             print("TRIAL DONE")
-            self.state = "exit"
-        #check the media that has to be played
+            #self.state = "greet"
+
+    def greet_cb(self, end_media):
+        if(self.state == "greet" and end_media.data == "True"):
+            self.ai_chatter.end_media_flag = True #per genereare altro prompt
+            print("ciao ciao")
+            #SALUTI FINALI
+
+
 
 if __name__ == "__main__":
     rospy.init_node('chatbot')
