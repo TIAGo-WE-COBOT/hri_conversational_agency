@@ -6,16 +6,17 @@ import sys
 from datetime import datetime
 
 class ChatLogger:
-    def __init__(self):
-        # Check for the `log` folder existence
+    def __init__(self, logdir='log'):
+        # Check for the log folder existence in the working directory
         try:
-            os.mkdir('log')
+            os.mkdir(logdir)
         except FileExistsError:
+            # Do nothing if the log folder exists
             pass
-
+            
         # Create a file for the current day interactions
         self.fname = 'log_' + self._get_time(sep = '_')[0] + '.md'
-        self.fpath = os.path.join('.', 'log', self.fname)
+        self.fpath = os.path.join(logdir, self.fname)
         try:
             f = open(self.fpath, 'x')
             f.write('# {} Conversation Log\n\n'.format(self._get_time(sep = '/')[0]))

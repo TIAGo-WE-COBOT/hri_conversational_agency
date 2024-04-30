@@ -17,6 +17,10 @@ from std_msgs.msg import String
 
 class ChatBot():
     def __init__(self):
+        # Get path to package root dir for relative imports
+        rospack = rospkg.RosPack()
+        pkg_root = rospack.get_path('hri_conversational_agency')
+
         self.state = "init" #DEFINE all the states 
         '''
         init
@@ -38,7 +42,7 @@ class ChatBot():
 
         self.real_conv = False #to switch betw the dummy and the real conversation
         # Initialize the OpenAI model to generate responses 
-        self.ai_chatter = OpenAIChatter()
+        self.ai_chatter = OpenAIChatter(os.path.join(pkg_root, 'log'))
         self.rasa_chatter = RasaChatBot()
         self.r_sound = EmitSound()
 
@@ -109,7 +113,11 @@ class ChatBot():
 
         self.model_response = ""
 
-        self.filename = "BFI_assessment_module_TRIAL2def.xlsx"
+        self.profiles_file = os.path.join(pkg_root, 
+                                            'profiles', 
+                                            "BFI_assessment_module_TRIAL2def.xlsx"
+                                            # TODO. Set filename from args
+                                            )
 
     def init_timer(self, duration):
         rospy.Timer(rospy.Duration(duration), self.init_timer_cb, oneshot=True)
@@ -166,7 +174,7 @@ class ChatBot():
         self.pers_data[str(trial2)] = self.trials[1][0] + "\n" + self.trials[1][1]
         self.pers_data[str(trial3)] = self.trials[2][0] + "\n" + self.trials[2][1]
         print(self.trials)
-        self.work_space.save(filename = self.filename)
+        self.work_space.save(filename = self.profiles_file)
 
     def setup(self):
         #self.randomization(1, 3, 3, 3)
@@ -178,16 +186,13 @@ class ChatBot():
             except ValueError:
                 print("Inserire un ID valido")
             
-            rospack = rospkg.RosPack()
-            #pkg_root = rospack.get_path('hri_conversational_agency')
-            #print(pkg_root)
-            # filepath_chat = os.path.join(pkg_root, 
+            # filepath_chat = os.path.join(self.pkg_root, 
             #                          'scripts', 
             #                          'BFI_assessment_module_TRIAL2copy.xlsx'
             #                          )
         
             # work_space = load_workbook(filename = filepath_chat, data_only=True) #switch with the real path of the excel file
-            self.work_space = load_workbook(filename = self.filename, data_only=True)        
+            self.work_space = load_workbook(filename = self.profiles_file, data_only=True)        
             #work_space = load_workbook(filename = "test.xlsx", data_only=True)
             self.pers_data = self.work_space["Preprocessed_Data"]
             col = self.pers_data["B"]
@@ -274,17 +279,17 @@ class ChatBot():
         if(self.ai_chatter.curr_trial == 1):
             self.pers_data[str(self.row[67].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.filename)
+            self.work_space.save(filename = self.profiles_file)
             #return
         elif(self.ai_chatter.curr_trial == 2):
             self.pers_data[str(self.row[69].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.filename)
+            self.work_space.save(filename = self.profiles_file)
             #return
         elif(self.ai_chatter.curr_trial == 3):
             self.pers_data[str(self.row[71].coordinate)] = "DONE"
             print(self.ai_chatter.curr_trial)
-            self.work_space.save(filename = self.filename)
+            self.work_space.save(filename = self.profiles_file)
             #return
 
         if self.state == "dummy" and not self.dummy_flag:

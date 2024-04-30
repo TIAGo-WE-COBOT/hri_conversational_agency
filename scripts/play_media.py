@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import os
 from playsound import playsound
 import cv2
 import rospy
+import rospkg
 from std_msgs.msg import String
 
 class MediaPlayer:
@@ -17,8 +19,10 @@ class MediaPlayer:
 
         self.type_media = ''
         self.media = ''
-        self.path_to_video = "/home/marconasato/VEX.mp4"
-        self.path_to_audio = "/home/marconasato/SOUEX.wav"
+        rospack = rospkg.RosPack()
+        pkg_root = rospack.get_path('hri_conversational_agency')
+        self.path_to_video = os.path.join(pkg_root, 'media', 'VEX.mp4')
+        self.path_to_audio = os.path.join(pkg_root, 'media', 'SOUEX.wav')
 
     def play_video(self, ptv):
         screen_name = "Video_Player"
@@ -63,14 +67,14 @@ class MediaPlayer:
             self.play_audio(self.path_to_audio)
             self.end_media_flag = String()
             self.end_media_flag.data = "True"
-            self.end_media_pub(self.end_media_flag)
+            self.end_media_pub.publish(self.end_media_flag)
 
         elif(self.type_media == 'V'):
             #print("Ripriduco video:", self.media)
             self.play_video(self.path_to_video)
             self.end_media_flag = String()
             self.end_media_flag.data = "True"
-            self.end_media_pub(self.end_media_flag)
+            self.end_media_pub.publish(self.end_media_flag)
 
 if __name__ == "__main__":
     rospy.init_node('media_player')

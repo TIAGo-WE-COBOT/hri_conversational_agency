@@ -5,7 +5,7 @@ import numpy as np
 import time
 ###DA IMPORTARE SU MEDIAPLAYER
 
-path_to_video = "/home/marconasato/VEX.mp4"
+# path_to_video = "/home/marconasato/VEX.mp4"
 
 # def play_video(ptv):
     
@@ -36,17 +36,30 @@ path_to_video = "/home/marconasato/VEX.mp4"
 
 # play_video(path_to_video)
 
-from playsound import playsound
+# from playsound import playsound
 
-path_to_audio = "/home/marconasato/SOUEX.wav"
+# path_to_audio = "/home/marconasato/SOUEX.wav"
 
-def riproduci_audio(file_audio):
-    try:
-        # Riproduci il file audio
-        playsound(file_audio)
-        print("finito")
-    except Exception as e:
-        print("Errore durante la riproduzione dell'audio:", str(e))
+# def riproduci_audio(file_audio):
+#     try:
+#         # Riproduci il file audio
+#         playsound(file_audio)
+#         print("finito")
+#     except Exception as e:
+#         print("Errore durante la riproduzione dell'audio:", str(e))
 
-# Chiamata alla funzione per riprodurre l'audio
-riproduci_audio(path_to_audio)
+# # Chiamata alla funzione per riprodurre l'audio
+# riproduci_audio(path_to_audio)
+
+m = [
+    {"role": "system", "content": "a"},
+    {"role": "user", "content": "b"},
+    {"role": "assistant", "content": "c"},
+    {"role": "user", "content": "d"}
+  ]
+
+n=1
+while(n!=3):
+    messages = m[-n]
+    print(messages)
+    n += 1
