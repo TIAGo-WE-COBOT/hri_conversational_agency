@@ -42,13 +42,13 @@ class OpenAIChatter():
         self.seed = SEED
         self.frequency_penalty = FREQUENCY_PENALTY
         self.presence_penalty = PRESENCE_PENALTY
-        self.log.log_model_parameters(self.model, 
-                                      self.max_tokens, 
-                                      self.temperature, 
-                                      self.seed, 
-                                      self.frequency_penalty,
-                                      self.presence_penalty
-                                      )
+        # self.log.log_model_parameters(self.model, 
+        #                               self.max_tokens, 
+        #                               self.temperature, 
+        #                               self.seed, 
+        #                               self.frequency_penalty,
+        #                               self.presence_penalty
+        #                               )
     ###POSSIBILE RIORGANIZZAZIONE DEL CODICE
     # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
     #     n_mod = 4 #to test a predefined prompt
@@ -87,19 +87,14 @@ class OpenAIChatter():
     #                 if(self.curr_mod == "P_LLM"):
     #                     self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
     #                 elif(self.curr_mod == "LLM"):
-    #                     self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-    #             elif(self.end_timer_flag):
-    #                 if(self.curr_mod == "P_LLM"):
-    #                     self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #                 elif(self.curr_mod == "LLM"):
-    #                     self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
-    #                 self.check_media_flag = True
-    #         elif(self.check_media_flag):
-    #             self.play_media_flag = True
-    #             #mettere le tre condizioni a seconda del media
-    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
+    #                     self.s_prompt = STD- story: happy path
+#   steps:
+#   - intent: greet
+#   - action: utter_greet
+#   - intent: mood_great #mettere anche che non sto molto bene(condizione o altra storia)
+#   - action: utter_ask_hobbies
+#   - intent: ask_hobbies
 
-    ###CODICE RIORGANIZZATO 2, DA TESTARE
     # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
     #          #check
     #         if(not self.end_timer_flag):

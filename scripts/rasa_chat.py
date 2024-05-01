@@ -3,10 +3,13 @@
 import requests
 import rospy
 from std_msgs.msg import String
+from rasa_logger import RasaChatLogger 
 
 class RasaChatBot:
-    def __init__(self):
+    def __init__(self, logdir='log'):
         self.rasa_server_url = 'http://localhost:5005/webhooks/rest/webhook'
+        self.rasa_log = RasaChatLogger(logdir=logdir)
+        self.rasa_log.rasa_log_open()
         self.rasa_interaction = 0
 
         self.rasa_curr_mod = ""
@@ -27,8 +30,13 @@ class RasaChatBot:
             print("Last interaction")
 
     def send_request(self, mess):
-        if(not self.last_int_flag): #conversazione normale   
+        if(self.rasa_interaction == 2):
+            print(self.rasa_interaction)
+            mess = "hobby1"
+        if(not self.last_int_flag): #conversazione normal
+            print(mess)   
             resp = requests.post(self.rasa_server_url, json={"message": mess})
+            print(resp.json())
             if resp.status_code == 200: #requested completed
                 rasa_response = resp.json()
                 self.chatbot_resp = rasa_response[0]['text']

@@ -33,7 +33,7 @@ class ChatBot():
         exit
         '''
 
-        self.tot_duration = 10 #duration of the effective conversation
+        self.tot_duration = 200 #duration of the effective conversation
 
         self.dummy_speech = ["domanda 1"] #, \
                              #"domanda 2"]#, \
@@ -43,7 +43,7 @@ class ChatBot():
         self.real_conv = False #to switch betw the dummy and the real conversation
         # Initialize the OpenAI model to generate responses 
         self.ai_chatter = OpenAIChatter(os.path.join(pkg_root, 'log'))
-        self.rasa_chatter = RasaChatBot()
+        self.rasa_chatter = RasaChatBot(os.path.join(pkg_root, 'log'))
         self.r_sound = EmitSound()
 
         # Listen to the model response
@@ -93,6 +93,10 @@ class ChatBot():
                                              String,
                                              queue_size=1
                                              )
+        
+        self.trigger_chatbot_pub = rospy.Publisher('asr/string',
+                                                   String,
+                                                   queue_size=1)
 
         self.slide_col = 0
         self.init_flag = False
@@ -245,7 +249,14 @@ class ChatBot():
                     print("Il paziente ha eseguito tutti i trials")
                     return                          
 
-            #if(self.ai_chatter.curr_mod == "P_LLM"):
+            if(self.ai_chatter.curr_mod == "LLM" or self.ai_chatter.curr_mod == "P_LLM"):
+                self.ai_chatter.log.log_model_parameters(self.ai_chatter.model, 
+                                                        self.ai_chatter.max_tokens, 
+                                                        self.ai_chatter.temperature, 
+                                                        self.ai_chatter.seed, 
+                                                        self.ai_chatter.frequency_penalty,
+                                                        self.ai_chatter.presence_penalty
+                                                        )
                 #skip if not P_LLM       
                 #print(row[0].value) #row[n] is a cell object, to return the value in cell use row[n].value
                 #row[0].value = row[0].value.rstrip(";").replace(";",", ").lower() #to format the string relative to the interests
@@ -313,6 +324,12 @@ class ChatBot():
             msg.data = ""
         if(self.idle_flag):
             self.h_listen_flag = True
+        #to trigger the conversation with the chatbot
+        if(self.ai_chatter.curr_mod == "CHATBOT" and self.rasa_chatter.rasa_interaction == 0):
+            fp = String()
+            fp.data = "###START THE CONVERSATION###"
+            self.trigger_chatbot_pub.publish(fp)
+        
         
 
     def r_listen_cb(self, msg):
@@ -352,7 +369,7 @@ class ChatBot():
                 self.ai_chatter.generate_s_prompt(self.gender, self.age, self.education, self.job, self.interests, self.extraversion, self.agreeableness, self.conscientiousness, self.neuroticism, self.openness)
                 print(self.ai_chatter.s_prompt)
                 r_ans = self.ai_chatter.generate_response(self.ai_chatter.n_interactions, self.ai_chatter.s_prompt, h_prompt) #string genereted by the model #
-                self.model_response = r_ans #model
+                #self.model_response = r_ans #model
                 # if(self.ai_chatter.end_timer_flag): #Use these lines to test the system without wasting tokens
                 #     if(not self.ai_chatter.find_media_flag):
                 #         r_ans = "Ciao, come stai?"+ "Canzone 1, canzone 2 oppure canzone 3"
@@ -389,11 +406,17 @@ class ChatBot():
                     self.h_listen_flag = False
                     self.r_listen_flag = False
                 
-                #togliere questo if e mettere if in rasa chatter
-
+                # if(self.rasa_chatter.rasa_interaction == 1):
+                #     self.rasa_chatter.send_request("###START THE CONVERSATION###")
+                #     r_ans = self.rasa_chatter.chatbot_resp
+                # else:
                 self.rasa_chatter.send_request(h_prompt)
-                print(self.rasa_chatter.chatbot_resp)
-                ###mettere i log come per llm e pllm, bisogna aggiungere metodi nello script rasa_chat
+                r_ans = self.rasa_chatter.chatbot_resp
+                print(r_ans)
+                self.rasa_chatter.rasa_log.rasa_log_curr_interaction(self.rasa_chatter.rasa_interaction)
+                self.rasa_chatter.rasa_log.rasa_log_input(h_prompt)
+                self.rasa_chatter.rasa_log.rasa_log_output(r_ans)
+
 
                 ######################################################################################
                 if(not self.rasa_chatter.rasa_play_media_flag):    
@@ -464,12 +487,19 @@ if __name__ == "__main__":
     rospy.init_node('chatbot')
     cb = ChatBot()
     def on_shutdown():
-        cb.ai_chatter.log.log_n_interactions(cb.ai_chatter.n_interactions) #
-        duration = cb.timer.elapsed_time()
-        cb.ai_chatter.log.log_duration(duration)
-        cb.ai_chatter.log.log_tot_tokens(cb.ai_chatter.tot_tokens)
-        cb.ai_chatter.log.log_close
-        print(json.dumps(cb.ai_chatter.conversation, indent=2))
+        if(cb.ai_chatter.curr_mod == "LLM" or cb.ai_chatter.curr_mod == "P_LLM"):
+            cb.ai_chatter.log.log_n_interactions(cb.ai_chatter.n_interactions) #
+            duration = cb.timer.elapsed_time()
+            cb.ai_chatter.log.log_duration(duration)
+            cb.ai_chatter.log.log_tot_tokens(cb.ai_chatter.tot_tokens)
+            cb.ai_chatter.log.log_close()
+            print(json.dumps(cb.ai_chatter.conversation, indent=2))
+        elif(cb.rasa_chatter.rasa_curr_mod == "CHATBOT"):
+            cb.rasa_chatter.rasa_log.rasa_log_n_interactions(cb.rasa_chatter.rasa_interaction)
+            duration = cb.timer.elapsed_time()
+            cb.rasa_chatter.rasa_log.rasa_log_duration(duration)
+            cb.rasa_chatter.rasa_log.rasa_log_close()
+
 
     rospy.on_shutdown(on_shutdown)
     rate = rospy.Rate(10)
