@@ -26,7 +26,7 @@ class OpenAIChatter():
         self.curr_media = ""
         self.curr_trial = 0
         self.media_list = []
-        self.music_list = ['bad Romance', 'closer', 'pamplona']
+        self.music_list = ['acqua azzurra, acqua chiara', 'destinazione paradiso', 'i want to break free']
         self.video_list = ['video film azione', 'video film romantico', 'documentario']
         self.audiolibro_list = ['il piccolo principe', 'sherlock holmes', 'la coscienza di zeno']
 
