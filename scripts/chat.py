@@ -33,9 +33,9 @@ class ChatBot():
         exit
         '''
 
-        self.tot_duration = 200 #duration of the effective conversation
+        self.tot_duration = 50 #duration of the effective conversation
 
-        self.dummy_speech = ["domanda 1"] #, \
+        self.dummy_speech = ["Ciao sono Tiago, il robot di servizio di Uicobot"] #, \
                              #"domanda 2"]#, \
                              #"domanda 3"]
         self.dummy_question = 0
@@ -329,6 +329,10 @@ class ChatBot():
             fp = String()
             fp.data = "###START THE CONVERSATION###"
             self.trigger_chatbot_pub.publish(fp)
+        elif((self.ai_chatter.curr_mod == "LLM" or self.ai_chatter.curr_mod == "P_LLM") and self.ai_chatter.n_interactions == 0):
+            fp = String()
+            fp.data = "Ciao, chi sei?"
+            self.trigger_chatbot_pub.publish(fp)
         
         
 
@@ -505,7 +509,7 @@ if __name__ == "__main__":
     rate = rospy.Rate(10)
     try:
         #cb.idle()
-        cb.init_timer(3)
+        cb.init_timer(15)
         rospy.spin()
     except KeyboardInterrupt:
         rospy.loginfo('Shutting down on user request.')
