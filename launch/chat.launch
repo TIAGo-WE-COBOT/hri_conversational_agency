@@ -1,14 +1,18 @@
 <launch>
     <!-- Set the path to the environment -->
-    <arg name = "venv"      default = "$(optenv OPENAI_VENV)" />
-    <arg name = "in_topic"  default = "input"   />
-    <arg name = "out_topic" default = "output"  />
+    <arg name = "venv"      default = "$(optenv HRI_CONVERSATIONAL_AGENCY)" />
+    <arg name = "backend"   default = "dummy" />
+    <arg name = "model"     default = "" />
+    <arg name = "ns"        default = "conversational_agent" />
+    <arg name = "request_topic"  default = "request"   />
+    <arg name = "response_topic" default = "response"  />
 
 
     <!-- Launch the node to chat with the conversational agent -->
-    <node pkg = "hri_conversational_agency" type = "chat.py" name = "chat"
-    output = "screen" launch-prefix="$(arg venv)" >
-        <remap from = "request"   to = "$(arg in_topic)" />
-        <remap from = "response"  to = "$(arg out_topic)" />
-    </node> 
+    <node pkg = "hri_conversational_agency" type = "chat.py" name = "chat" ns="$(arg ns)"
+    output = "screen" launch-prefix="$(arg venv)" 
+    args = "--backend $(arg backend) --model $(arg model)">
+        <remap from = "request"   to = "$(arg request_topic)" />
+        <remap from = "response"  to = "$(arg response_topic)" />
+    </node>
 </launch>
