@@ -2,7 +2,7 @@ import os
 import sys
 from datetime import datetime
 
-class ChatLogger:
+class OpenAILogger:
     def __init__(self):
         # Check for the `log` folder existence
         try:

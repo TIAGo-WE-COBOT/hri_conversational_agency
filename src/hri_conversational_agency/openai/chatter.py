@@ -1,11 +1,11 @@
 import openai
 
-from conversational_agency.openai_utils.cfg import API_KEY, MAX_TOKENS, TEMPERATURE, PROMPT_TEMPLATE
-from conversational_agency.openai_utils.logger import ChatLogger
+from hri_conversational_agency.openai.cfg import API_KEY, MAX_TOKENS, TEMPERATURE, PROMPT_TEMPLATE
+from hri_conversational_agency.openai.logger import OpenAILogger    
 
 class OpenAIChatter():
     def __init__(self, openai_api_key = API_KEY, model = "text-curie-001"):
-        self.log = ChatLogger()
+        self.log = OpenAILogger()
         self.log.log_open()
         openai.api_key = API_KEY
 
@@ -17,7 +17,8 @@ class OpenAIChatter():
         self.log.log_input(prompt)
         return prompt
 
-    def generate_response(self, prompt, max_tokens = MAX_TOKENS, temperature = TEMPERATURE):
+    def generate_response(self, msg, max_tokens = MAX_TOKENS, temperature = TEMPERATURE):
+        prompt = self.generate_prompt(msg.data)
         response = openai.Completion.create(
             model = self.model,
             prompt = prompt,
