@@ -1,5 +1,5 @@
 # Package-specific files/folders
-*/ACCOUNTS.md
+log/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
