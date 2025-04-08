@@ -4,20 +4,51 @@ This package is a container for ROS modules, developed for easy integration of c
 
 ## Installation
 
+* Open a terminal and move to the `src` folder of your workspace (here assumed to be `~/hri_ws`)
+    ```
+    cd `~/hri_ws/src`
+    ```
 * Clone the repo with
     ```
-    git clone ...
+    git clone https://github.com/TIAGo-WE-COBOT/hri_conversational_agency.git
     ```
-* Install the common requirements with
+<!--* Install the common requirements with
     ```
     pip install -r requirements.txt
     ```
-> [!NOTE]
-> The above command will not install the requirements for any specific backend (as OpenAI-GPT or Meta LLama). As such, you will only be able to run a pre-scripted bot as in []
+-->
+* Go back to the root of the workspace and build the package
+    ```
+    cd ..
+    catkin build hri_conversational_agency
+    ```
 
-## Setup
+> [!IMPORTANT]
+> The above command will not install the requirements for any specific backend. As such, you will only be able to run a pre-scripted bot (`backend=dummy`). <br>
+> See the following section to install specific backend(s).
 
-<!--### OpenAI
+### Backend
+#### Ollama
+
+* Install Ollama as described in the [docs](https://github.com/ollama/ollama/blob/main/docs/linux.md) with
+    ```
+    curl -fsSL https://ollama.com/install.sh | sh
+    ```
+* Install the Python bindings for Ollama with
+    ```
+    pip install ollama-python
+    ```
+* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat.py` node out-of-the-box, pull the model use as default with
+    ```
+    ollama pull llama3.2:3b
+    ```
+
+<!--
+#### GPT4All
+
+TODO. See Issues.
+
+#### OpenAI
 
 - Get your API key from [this link](https://platform.openai.com/account/api-keys) and copy it to your clipboard.
 - Create a file named `.env` in the package root, if you do not already have one.
@@ -28,15 +59,48 @@ This package is a container for ROS modules, developed for easy integration of c
     where `<your_api_key>` has to be susbstituted with the actual API key obtained at the first step.
 
 > [!IMPORTANT]
-> Make sure that the `.gitignore` file includes a `.env` or `*.env` entry to avoid the file with the API key being tracked by Git. -->
-
-## How to run
-
-TODO.
+> Make sure that the `.gitignore` file includes a `.env` or `*.env` entry to avoid the file with the API key being tracked by Git. 
+-->
 
 ## How to use
 
-TODO.
+### Backend
+
+#### Dummy
+
+* Open a terminal (let's call it *T1*), launch `chat.launch` with `backend:=dummy` (default)
+    ```
+    roslaunch hri_conversational_agency chat.launch
+    ```
+* Open another terminal (*T2*) and start listening to the `/conversational_agent/response` topic
+    ```
+    rostopic echo /conversational_agent/response
+    ```
+* Open another terminal (*T3*) and ask something to the conversational agent, by publishing on topic 
+    ```
+    rostopic pub -1 /conversational_agent/request std_msgs/String "data: 'Ciao! Parlami di te'" 
+    ```
+    where `'Ciao! Parlami di te'` might be substituted with anything you would like to ask to the agent.
+    
+    In *T2* you should soon see the response from the conversational agent. Keep chatting as you like!
+
+#### Ollama
+
+* Run Ollama with
+    ```
+    sudo ollama serve
+    ```
+    and let it run.
+> [!NOTE]
+> In my current Docker setup, `sudo` permission seems necessary to run Ollama against the GPU.<br>
+> Requires further investigation.
+
+* In another terminal, launch `chat.launch` with `backend:=ollama`
+    ```
+    roslaunch hri_conversational_agency chat.launch backend:=ollama
+    ```
+
+* You can now check the model behavior as done for the [dummy backend](#dummy).
 
 <!--
 ## Troubleshooting

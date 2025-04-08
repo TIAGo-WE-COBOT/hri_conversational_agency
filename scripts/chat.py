@@ -4,19 +4,27 @@
 The idea of this node is to implement a standard interface for several conversational agents. The core implementation of the agent should be located in the `hri_conversational_agency/src` subfolder.
 Any higher-level interaction coordination should be implemented in a state-machine like node, sending requests to this node and receiving responses.
 '''
+import sys
 import argparse
 
 import rospy
+import rospkg
 from std_msgs.msg import String
 
 class ChatBotNode():
     def __init__(self, backend='dummy', **kwargs):
+        r = rospkg.RosPack()
+        pkg_root = r.get_path('hri_conversational_agency')
         # Initialize the agent to generate responses
         if backend == 'dummy':
             from hri_conversational_agency.dummy import DummyChatter
             self.chatter = DummyChatter()
-        #elif backend == 'another':
-        #    pass
+        elif backend == 'gpt4all':
+            from hri_conversational_agency.gpt4all import GPT4AllChatter
+            self.chatter = GPT4AllChatter(model=pkg_root + '/models')
+        elif backend == 'ollama':
+            from hri_conversational_agency.ollama import OllamaChatter
+            self.chatter = OllamaChatter()
         else:
             raise NotImplementedError("The backend '{}' is not implemented. See `src` folder for available backends, or implement your own bindings for a new backend.".format(backend))
         # Listen to user input
@@ -37,21 +45,21 @@ class ChatBotNode():
         self.text = ""
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Implement a '
-    )
+    rospy.init_node('chatbot')
+    print(sys.executable)
+    parser = argparse.ArgumentParser(
+        description='A ROS node implementing a text-based conversational agent'
+        )
     parser.add_argument('-b', '--backend', type=str, 
                         default='dummy',
-                        description="The backend used to implement the conversational agent to use. Available backends: dummy, openai"
+                        help="The backend used to implement the conversational agent to use. Available backends: dummy, openai"
                         )
-    parser.parse_args()
-    rospy.init_node('chatbot')
-    cb = ChatBotNode(backend=parser.args.backend, 
-                     **dict((k,v) 
-                            for k,v in vars(parser.args).items() 
-                            if k!='backend'
-                            )
+    args, kwargs = parser.parse_known_args(rospy.myargv()[1:])
+    cb = ChatBotNode(backend=args.backend, 
+                     **dict((kwargs[i].rstrip('--'), kwargs[i+1]) 
+                     for i in range(0, len(kwargs), 2))
                     )
-    rospy.on_shutdown(cb.chatter.log.logfile_close)
+    rospy.on_shutdown(cb.chatter.on_shutdown)
     try:
         rospy.spin()
     except KeyboardInterrupt:
