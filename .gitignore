@@ -1,5 +1,6 @@
 # Package-specific files/folders
 log/*
+models/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
