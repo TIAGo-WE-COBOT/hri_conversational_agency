@@ -38,7 +38,13 @@ This package is a container for ROS modules, developed for easy integration of c
     ```
     pip install ollama-python
     ```
-* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat.py` node out-of-the-box, pull the model use as default with
+* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat.py` node out-of-the-box, you have to pull the model used as default first. To do so:
+    * Start Ollama
+    ```
+    ollama serve
+    ```
+    and let it run
+    * In a different terminal, run
     ```
     ollama pull llama3.2:3b
     ```
@@ -88,12 +94,9 @@ TODO. See Issues.
 
 * Run Ollama with
     ```
-    sudo ollama serve
+    ollama serve
     ```
     and let it run.
-> [!NOTE]
-> In my current Docker setup, `sudo` permission seems necessary to run Ollama against the GPU.<br>
-> Requires further investigation.
 
 * In another terminal, launch `chat.launch` with `backend:=ollama`
     ```
