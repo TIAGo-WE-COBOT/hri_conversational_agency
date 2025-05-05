@@ -38,11 +38,6 @@ class GPT4AllChatter():
         self.log.log_output(response)
         return response
 
-    def on_shutdown(self):
-        self.log.logfile_close()
-        self.chat.close()
-        self.model.close()
-
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. The method is currently not implemented for GPT4All backend. The method is only here to comply with the interface of the other agents.
         The method will raise a NotImplementedError if called.
@@ -66,4 +61,9 @@ class GPT4AllChatter():
             NotImplementedError: The method is only here to comply with the interface of the other agents.
         """
         raise NotImplementedError("The `set_system_prompt` method is not implemented for GPT4All backend.")
+    
+    def on_shutdown(self):
+        self.log.logfile_close()
+        self.chat.close()
+        self.model.close()
 
