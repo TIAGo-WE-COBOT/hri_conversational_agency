@@ -34,6 +34,9 @@ class Logger:
 
     def log_output(self, response):
         self.f.write('{}: {}\n\n'.format(self.agent_name, response))
+    
+    def log_system_prompt(self, prompt):
+        self.f.write('SYSTEM: {}\n\n'.format(prompt))
 
     def logfile_open(self):
         self.f = open(self.fpath, 'a')
