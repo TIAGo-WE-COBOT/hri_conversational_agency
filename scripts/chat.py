@@ -64,7 +64,7 @@ class ChatBotNode():
         except Exception as e:
             rospy.logerr("Error setting history: \n{}".format(e))
             return SetHistoryResponse(False, str(e))
-        return SetHistoryResponse(True)
+        return SetHistoryResponse(True, "")
 
     def set_sys_prompt(self, req):
         try:
@@ -72,7 +72,7 @@ class ChatBotNode():
         except Exception as e:
             rospy.logerr("Error setting system prompt: \n{}".format(e))
             return SetSystemPromptResponse(False, str(e))
-        return SetSystemPromptResponse(True)
+        return SetSystemPromptResponse(True, "")
     
 if __name__ == "__main__":
     rospy.init_node('chatbot')
