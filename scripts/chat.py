@@ -11,6 +11,8 @@ import rospy
 import rospkg
 from std_msgs.msg import String
 
+from hri_conversational_agency.srv import SetHistory, SetHistoryResponse, SetSystemPrompt, SetSystemPromptResponse
+
 class ChatBotNode():
     def __init__(self, backend='dummy', **kwargs):
         r = rospkg.RosPack()
@@ -27,11 +29,21 @@ class ChatBotNode():
             self.chatter = OllamaChatter()
         else:
             raise NotImplementedError("The backend '{}' is not implemented. See `src` folder for available backends, or implement your own bindings for a new backend.".format(backend))
+        # Expose services for the user to interact with the agent
+        self.set_history_srv = rospy.Service('set_history', 
+                                             SetHistory, 
+                                             self.set_history
+                                             )
+        self.set_sys_prompt_srv = rospy.Service('set_sys_prompt',
+                                                SetSystemPrompt, 
+                                                self.set_sys_prompt
+                                                )
         # Listen to user input
         self.req_sub = rospy.Subscriber('request',
                                         String, 
                                         self.respond
                                         )
+        # TODO. Consider switching to `ChatMessage` msg type (cleaner, though more complex for quick-and-dirty use).
         # Initialize the publisher to broadcast the model response
         self.res_pub = rospy.Publisher('response',
                                        String, 
@@ -44,9 +56,26 @@ class ChatBotNode():
         self.res_pub.publish(ans)
         self.text = ""
     
+    def set_history(self, req):
+        try:
+            self.chatter.set_history([(chat_msg.role, chat_msg.content) 
+                                    for chat_msg in req.history]
+                                    )
+        except Exception as e:
+            rospy.logerr("Error setting history: \n{}".format(e))
+            return SetHistoryResponse(False, str(e))
+        return SetHistoryResponse(True)
+
+    def set_sys_prompt(self, req):
+        try:
+            self.chatter.set_sys_prompt(req.content)
+        except Exception as e:
+            rospy.logerr("Error setting system prompt: \n{}".format(e))
+            return SetSystemPromptResponse(False, str(e))
+        return SetSystemPromptResponse(True)
+    
 if __name__ == "__main__":
     rospy.init_node('chatbot')
-    print(sys.executable)
     parser = argparse.ArgumentParser(
         description='A ROS node implementing a text-based conversational agent'
         )

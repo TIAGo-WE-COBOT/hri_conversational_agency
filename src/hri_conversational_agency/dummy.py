@@ -43,5 +43,29 @@ class DummyChatter():
         self.log.log_output(response)
         return response
 
+    def set_history(self, history):
+        """Receive a list of tuples (role, content) to set the history of the agent. The method is not implemented in this class, as the dummy agent does not have any history. The method is only here to comply with the interface of the other agents.
+        The method will raise a NotImplementedError if called.
+
+        Args:
+            history ([(str, str)]): List of tuples (role, content) to set the history of the agent.
+
+        Raises:
+            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot have any history.
+        """
+        raise NotImplementedError("The dummy agent cannot implement any history, it is just a script reader.")
+
+    def set_sys_prompt(self, prompt):
+        """Receive a system prompt to set the system prompt of the agent. The method is not implemented in this class, as the dummy agent does not have any system prompt. The method is only here to comply with the interface of the other agents.
+        The method will raise a NotImplementedError if called.
+
+        Args:
+            prompt (str): System prompt to set the system prompt of the agent.
+
+        Raises:
+            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot have any system prompt.
+        """
+        raise NotImplementedError("The dummy agent cannot implement any system prompt, it is just a script reader.")
+
     def on_shutdown(self):
         self.log.logfile_close()
