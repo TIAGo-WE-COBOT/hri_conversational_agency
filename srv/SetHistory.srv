@@ -1,0 +1,4 @@
+ChatMessage[]   history # empty array --> reset
+---
+bool success
+string status

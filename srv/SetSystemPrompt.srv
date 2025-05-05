@@ -1,0 +1,4 @@
+string content  # this field will be passed to the model with role 'system'
+---
+bool success
+string status
