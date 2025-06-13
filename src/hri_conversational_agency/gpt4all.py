@@ -5,9 +5,10 @@ import os
 
 from gpt4all import GPT4All
 
+from hri_conversational_agency.base import BaseChatter
 from hri_conversational_agency.logger import Logger
 
-class GPT4AllChatter():
+class GPT4AllChatter(BaseChatter):
     def __init__(self, model="Meta-Llama-3-8B-Instruct.Q4_0.gguf", model_path=None, device='gpu'):
         """Initialize the GPT4AllChatter object.
 

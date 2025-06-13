@@ -1,23 +1,23 @@
 """
-A dummy conversational agent that "generates" responses to user input based on a script (i.e. a list of strings). On each request, the chatter will simply return the next line in the script, regardless the content of the input.
+A conversational agent that generates responses to user input based on Ollama models.
 """
 
 from ollama import chat
 
+from hri_conversational_agency.base import BaseChatter
 from hri_conversational_agency.logger import Logger
 
-class OllamaChatter():
-    def __init__(self, model='llama3.2:3b', old_messages=[]):
-        """Initialize the DummyChatter object.
+class OllamaChatter(BaseChatter):
+    def __init__(self, model='llama3.2:3b'):
+        """Initialize the OllamaChatter object.
 
         Args:
-            responses ([str], optional): list of strings where each list item is a line of the script. Defaults to DEFAULT_RESPONSES.
-            restart (bool, optional): if True, the DummyChatter will restart from the first line when the last line in the script is reached. Defaults to False.
+            model (str, optional): The name of the model to use for the Ollama agent. Defaults to 'llama3.2:3b'.
+            The model should be available in the Ollama server. You can check the available models with `ollama list` and retrieve the model with `ollama pull <model_name>` if needed.
         """
         self.log = Logger(agent_name='ollama - ' + model)
         self.log.logfile_open()
         self.model = model
-        self.messages = old_messages
 
     def generate_response(self, request):
         """The method basically implements a script reader. It will return the next line in the script. Unlike typical conversational agents, the method does not take the user input into account. The `request` parameter is used for logging purposes only. The script is defined in the `responses` parameter.

@@ -1,14 +1,14 @@
 """
 A dummy conversational agent that "generates" responses to user input based on a script (i.e. a list of strings). On each request, the chatter will simply return the next line in the script, regardless the content of the input.
 """
-
+from hri_conversational_agency.base import BaseChatter
 from hri_conversational_agency.logger import Logger
 
 DEFAULT_RESPONSES = ["I am a dummy model, I cannot answer your question.", 
                      "Goodbye!"
                      ]
 
-class DummyChatter():
+class DummyChatter(BaseChatter):
     def __init__(self, responses = DEFAULT_RESPONSES, restart=False):
         """Initialize the DummyChatter object.
 
@@ -43,6 +43,18 @@ class DummyChatter():
         self.log.log_output(response)
         return response
 
+    def set_context(self, context):
+        """Receive a string to set the context for the agent. The method is not implemented in this class, as the dummy agent does not have any history. The method is only here to comply with the interface of the other agents.
+        The method will raise a NotImplementedError if called.
+
+        Args:
+            context (str): String to set the context of the agent.
+
+        Raises:
+            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot know any context.
+        """
+        raise NotImplementedError("The dummy agent cannot implement any context, it is just a script reader.")
+
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. The method is not implemented in this class, as the dummy agent does not have any history. The method is only here to comply with the interface of the other agents.
         The method will raise a NotImplementedError if called.
@@ -56,11 +68,11 @@ class DummyChatter():
         raise NotImplementedError("The dummy agent cannot implement any history, it is just a script reader.")
 
     def set_sys_prompt(self, prompt):
-        """Receive a system prompt to set the system prompt of the agent. The method is not implemented in this class, as the dummy agent does not have any system prompt. The method is only here to comply with the interface of the other agents.
+        """Receive a string to set the system prompt of the agent. The method is not implemented in this class, as the dummy agent does not have any system prompt. The method is only here to comply with the interface of the other agents.
         The method will raise a NotImplementedError if called.
 
         Args:
-            prompt (str): System prompt to set the system prompt of the agent.
+            prompt (str): String to set the system prompt of the agent.
 
         Raises:
             NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot have any system prompt.
