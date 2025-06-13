@@ -1,0 +1,4 @@
+string content  # the string to set (system prompt, context, etc.)
+---
+bool success
+string status
