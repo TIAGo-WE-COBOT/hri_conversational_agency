@@ -37,6 +37,10 @@ class ChatBotNode():
     def _init_services(self):
         """Initialize the services to set the history and system prompt of the agent."""
         # Expose services for the user to interact with the agent
+        self.set_context_srv = rospy.Service('set_context',
+                                             SetAgentContent, 
+                                             self.set_context
+                                             )
         self.set_history_srv = rospy.Service('set_history', 
                                              SetHistory, 
                                              self.set_history

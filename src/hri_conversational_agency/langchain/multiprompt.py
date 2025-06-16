@@ -20,18 +20,6 @@ from langgraph.graph import END, START, StateGraph
 from hri_conversational_agency.base import BaseChatter
 from hri_conversational_agency.logger import Logger
 
-DEFAULT_ROUTER_PROMPT = """You are an assistant who has to choose which expert to route the question to. Experts are:
-{}
-Based on the question, choose the expert that is most relevant to answer it. Respond with the name of the expert only.
-"""
-DEFAULT_EXPERTS = {
-                   "rag": "answers questions about history, historical events, periods, figuresm and culture.",
-                   "fallback": "answers on general questions, when no expert is found.",
-                   }
-DEFAULT_CONTEXT = "This expert only answers in capital letters in the same language of the question."
-DEFAULT_RAG_PROMPT = "You are a helpful assistant. Here is the conversation so far: \n{history}\n. Answer all questions to the best of your ability, using the provided context. Context: {context} /no_think"
-DEFAULT_FALLBACK_PROMPT = "You are a helpful assistant. Answer all questions to the best of your ability Here is the conversation so far: \n{history}\n /no_think"
-
 class LangchainChatter(BaseChatter):
     # Define schema for multi-prompt chain output
     class RouteQuery(TypedDict):
@@ -49,11 +37,12 @@ class LangchainChatter(BaseChatter):
                             #   'content': 'message content'
                             # }
 
-    def __init__(self, model='qwen3:4b', model_kwargs=None, router_prompt=DEFAULT_ROUTER_PROMPT, router_experts_dict=DEFAULT_EXPERTS, rag_prompt=DEFAULT_RAG_PROMPT, context=DEFAULT_CONTEXT, fallback_prompt=DEFAULT_FALLBACK_PROMPT, **kwargs):
+    def __init__(self, model='qwen3:4b', prompts_dict=None,
+     router_experts_dict=None, rag_context=None, **kwargs):
         """Initialize the LangchainChatter object.
 
         Args:
-            model (str, optional): The name of the model to use for the Ollama agent. Defaults to 'llama3.2:3b'.
+            model (str, optional): The name of the model to use for the Ollama agent. Defaults to 'qwen3:4b'.
             The model should be available in the Ollama server. You can check the available models with `ollama list` and retrieve the model with `ollama pull <model_name>` if needed.
         """
         # Initialize the logger to store the dialogue history
@@ -61,19 +50,20 @@ class LangchainChatter(BaseChatter):
         self.log.logfile_open()
         # Initialize the LLMs
         self.llm = ChatOllama(model=model,
-                              model_kwargs=model_kwargs
+                              model_kwargs=kwargs.pop('model_kwargs', {}),
                               )
         self.messages = [] # chat history, to be used for model "memory"
         # Set prompt and available "experts" for the routing chain. The experts are defined as a dictionary where the keys are the expert names and the values are their descriptions.
-        self.router_prompt = router_prompt
+        self.router_prompt = prompts_dict["router_prompt"]
         self.router_experts_dict = router_experts_dict
         self._build_router_chain()
         # Set prompt and context for the Retrieval-Augmented Generation (RAG) chain.
-        self.rag_prompt = rag_prompt
-        self.rag_context = context
+        self.rag_prompt = prompts_dict["rag_prompt"]
+        self.rag_context = rag_context
+        self.rag_kwargs = kwargs.pop('rag_kwargs', {})
         self._build_rag_chain(build_retriever=True)
         # Set the fallback prompt for an simple chat model that will be used when no relevant context is found.
-        self.fallback_prompt = fallback_prompt
+        self.fallback_prompt = prompts_dict["fallback_prompt"]
         self._build_fallback_chain()
         # Build the multi-prompt chain that will
         # 1) Select the "expert" via the router_chain, and collect the answer
@@ -93,7 +83,6 @@ class LangchainChatter(BaseChatter):
                                                  "history": state["history"]}, config)}
 
     def fallback_query(self, state: State, config: RunnableConfig):
-        print(state["history"])
         return {"answer": self.fallback_chain.invoke({"input": state["query"],
                                                  "history": state["history"]}, config)}
 
@@ -128,7 +117,7 @@ class LangchainChatter(BaseChatter):
             {'role': 'assistant', 'content': response}
         ]
         # Log the output for later inspection of the dialogue
-        self.log.log_output("[{} {}]".format(
+        self.log.log_output("[{}] {}".format(
             state["destination"]["destination"].lower(),
             response)
         )
@@ -214,7 +203,7 @@ class LangchainChatter(BaseChatter):
         )
         print("Done.")
     
-    def _build_rag_chain(self, build_retriever=True, **rag_kwargs):
+    def _build_rag_chain(self, build_retriever=True):
         """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context.
         
         Args:
@@ -222,14 +211,18 @@ class LangchainChatter(BaseChatter):
             rag_kwargs (dict): Additional keyword arguments to pass to the RAG chain.
         """
         print("Building RAG chain...", end=' ', flush=True)
-        if build_retriever or not hasattr(self, 'retriever'):
+        if build_retriever or not hasattr(self, 'rag_retriever'):
             # Split the context into chunks
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
+            text_splitter_kwargs = self.rag_kwargs.get('text_splitter_kwargs',
+                                                        {})
+            text_splitter = RecursiveCharacterTextSplitter(
+                **text_splitter_kwargs
+                )
             texts = text_splitter.split_text(self.rag_context)
-            # Create embeddings for the context
+            # Create embeddings for the context 
             embeddings = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-mpnet-base-v2",
-                model_kwargs={"device": "cuda"}
+                model_kwargs=self.rag_kwargs.get('embeddings_kwargs', {}),
                 )
             # Create a vector store from the context chunks
             vector_store = FAISS.from_texts(texts, embeddings)
@@ -237,13 +230,14 @@ class LangchainChatter(BaseChatter):
             # TODO. Allow saving and loading the vector store to/from disk.
             self.rag_retriever = vector_store.as_retriever(
                 search_type="similarity",
-                search_kwargs={"k": 3}
+                search_kwargs=self.rag_kwargs.get('retriever_kwargs', {}),
             )
         # Build the RAG chain using the retriever and the prompt
         self.rag_chain = (
             {
-                "context": self.rag_retriever,
-                "input": RunnablePassthrough(),
+                "context": itemgetter("input") | self.rag_retriever,
+                "input": itemgetter("input"),
+                "history": itemgetter("history")          
             }
             | self._format_chat_prompt(self.rag_prompt)
             | self.llm
@@ -253,7 +247,7 @@ class LangchainChatter(BaseChatter):
 
     def _build_fallback_chain(self):
         """Build the fallback chain for the agent. The chain will be used to generate a response when no relevant context is found."""
-        print("Initializing fallback chain...", end=' ', flush=True)
+        print("Building fallback chain...", end=' ', flush=True)
         self.fallback_chain = (
             self._format_chat_prompt(self.fallback_prompt) 
             | self.llm 
@@ -276,8 +270,7 @@ class LangchainChatter(BaseChatter):
         experts_str = "\n".join(["- {}: {}".format(name, desc) 
                                  for name, desc in experts.items()
                                  ])
-        return prompt.format(experts_str) + experts_str
-
+        return prompt.format(experts=experts_str)
     @staticmethod
     def _format_answer(text: str) -> str:
         """Remove <think>...</think> blocks and trailing newlines.

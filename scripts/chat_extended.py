@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
-''' This node simply waits for a request from the user and then generates a response using the selected conversational agent.
-The idea of this node is to implement a standard interface for several conversational agents. The core implementation of the agent should be located in the `hri_conversational_agency/src` subfolder.
-Any higher-level interaction coordination should be implemented in a state-machine like node, sending requests to this node and receiving responses.
-'''
+"""This script implements a ROS node that extends the ChatBotNode to use Langchain for conversational agents.
+"""
+
+import os
+import yaml
 
 import rospy
+import rospkg
 
 from chat import ChatBotNode
 from hri_conversational_agency.langchain.multiprompt import LangchainChatter
@@ -19,7 +21,21 @@ class ExtendedChatBotNode(ChatBotNode):
             backend (str, optional): The name of the model to use for the Langchain agent. Defaults to 'langchain'.
             The model should be available in the Langchain server. You can check the available models with `langchain list` and retrieve the model with `langchain pull <model_name>` if needed.
         """
-        self.chatter = LangchainChatter()
+        r = rospkg.RosPack()
+        pkg_root = r.get_path('hri_conversational_agency')
+        # Get the agent configuration from the YAML file
+        agent_cfg_yaml_path = rospy.get_param(
+            '~agent_cfg_yaml_path',
+            os.path.join(pkg_root, 'cfg', 'multiprompt_default.yaml')
+        )
+        with open(agent_cfg_yaml_path, 'r', encoding='utf-8') as f:
+            agent_cfg_dict = yaml.safe_load(f)
+        # Initialize the agent to generate responses
+        self.chatter = LangchainChatter(
+            prompts_dict=agent_cfg_dict["prompts_dict"],
+            router_experts_dict=agent_cfg_dict["router_experts_dict"],
+            rag_context=agent_cfg_dict["rag_context"]
+        )
         # Initialize the services, publishers and subscribers to interact with the agent via ROS
         self._init_services()
         self._init_subs()
@@ -28,24 +44,56 @@ class ExtendedChatBotNode(ChatBotNode):
     def _init_services(self):
         super()._init_services()
         # Add additional services
-        self.set_rag_prompt = rospy.Service('set_rag_prompt',
+        self.set_rag_prompt_srv = rospy.Service('set_rag_prompt',
                                             SetAgentContent, 
-                                            self.set_context
+                                            self.set_rag_prompt
                                             )
-        self.set_fallback_prompt = rospy.Service('set_fallback_prompt',
+        self.set_fallback_prompt_srv = rospy.Service('set_fallback_prompt',
                                                 SetAgentContent, 
                                                 self.set_fallback_prompt
                                                 )
     
     def set_rag_prompt(self, req):
-        return SetAgentContentResponse(
-            success=self.chatter.set_sys_prompt(req.content)
-        )
+        """Set the prompt for the RAG (Retrieval-Augmented Generation) agent.
+
+        Args:
+            req (hri_conversational_agency/SetAgentContent): The request containing the content to set as prompt.
+
+        Returns:
+            SetAgentContentResponse: The response indicating success or failure of the operation.
+        """
+        try:
+            return SetAgentContentResponse(
+                success=self.chatter.set_rag_prompt(req.content),
+                status=""
+            )
+        except Exception as e:
+            rospy.logerr("Error setting RAG prompt: \n{}".format(e))
+            return SetAgentContentResponse(
+                success=False,
+                status=str(e)
+            )
 
     def set_fallback_prompt(self, req):
-        return SetAgentContentResponse(
-            success=self.chatter.set_fallback_prompt(req.content)
-        )
+        """Set the prompt for the fallback agent.
+        
+        Args:
+            req (hri_conversational_agency/SetAgentContent): The request containing the content to set as prompt.
+        
+        Returns:
+            SetAgentContentResponse: The response indicating success or failure of the operation.
+        """
+        try:
+            return SetAgentContentResponse(
+                success=self.chatter.set_fallback_prompt(req.content),
+                status=""
+            )
+        except Exception as e:
+            rospy.logerr("Error setting fallback prompt: \n{}".format(e))
+            return SetAgentContentResponse(
+                success=False,
+                status=str(e)
+            )
 
 if __name__ == "__main__":
     rospy.init_node('chatbot')
