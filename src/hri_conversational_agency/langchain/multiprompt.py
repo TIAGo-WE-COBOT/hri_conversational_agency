@@ -29,8 +29,8 @@ DEFAULT_EXPERTS = {
                    "fallback": "answers on general questions, when no expert is found.",
                    }
 DEFAULT_CONTEXT = "This expert only answers in capital letters in the same language of the question."
-DEFAULT_RAG_PROMPT = "You are a helpful assistant. Answer all questions to the best of your ability, using the provided context. Context: {context} /no_think"
-DEFAULT_FALLBACK_PROMPT = "You are a helpful assistant. Answer all questions to the best of your ability /no_think"
+DEFAULT_RAG_PROMPT = "You are a helpful assistant. Here is the conversation so far: \n{history}\n. Answer all questions to the best of your ability, using the provided context. Context: {context} /no_think"
+DEFAULT_FALLBACK_PROMPT = "You are a helpful assistant. Answer all questions to the best of your ability Here is the conversation so far: \n{history}\n /no_think"
 
 class LangchainChatter(BaseChatter):
     # Define schema for multi-prompt chain output
@@ -89,10 +89,13 @@ class LangchainChatter(BaseChatter):
             return {"destination": destination}
     
     def rag_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.rag_chain.invoke(state["query"], config)}
+        return {"answer": self.rag_chain.invoke({"input": state["query"],
+                                                 "history": state["history"]}, config)}
 
     def fallback_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.fallback_chain.invoke(state["query"], config)}
+        print(state["history"])
+        return {"answer": self.fallback_chain.invoke({"input": state["query"],
+                                                 "history": state["history"]}, config)}
 
     def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query"]:
         destination = state["destination"]["destination"].lower()
@@ -116,15 +119,14 @@ class LangchainChatter(BaseChatter):
         # Log the input for later inspection of the dialogue
         self.log.log_input(request)
         # Generate the response
-        state = self.app.invoke({"query": request})
+        state = self.app.invoke({"query": request, "history": self.messages})
         response = self._format_answer(state["answer"])
         # Add the reponse to the messages to maintain the chat history
-        """
+        # Update history
         self.messages += [
             {'role': 'user', 'content': request},
-            {'role': 'assistant', 'content': response.message.content}
+            {'role': 'assistant', 'content': response}
         ]
-        """
         # Log the output for later inspection of the dialogue
         self.log.log_output("[{} {}]".format(
             state["destination"]["destination"].lower(),
@@ -160,14 +162,18 @@ class LangchainChatter(BaseChatter):
         """Receive a prompt to set the router prompt of the agent. Any previous system prompt will be deleted.
         
         Args:
-            prompt (str): System prompt to set the system prompt of the agent.
+            prompt (str): String to set as the system prompt of the router chain.
         """
         self.router_prompt = prompt
         self._build_router_chain()
         self._build_app()
 
     def set_fallback_prompt(self, prompt):
-        """Set the fallback prompt for the agent. The prompt will be used when the agent cannot find a relevant context."""
+        """Set the fallback prompt for the agent. The prompt will be used when the agent cannot find a relevant context.
+        
+        Args:
+            prompt (str): The system prompt to set for the fallback agent.
+        """
         self.fallback_prompt = prompt
         self._build_fallback_chain()
         self._build_app()
@@ -178,6 +184,8 @@ class LangchainChatter(BaseChatter):
 
     #region Chain objects definition
     def _build_app(self):
+        """Build the multi-prompt chain for the agent. The chain will be used to route the input query to the appropriate expert, and invoke a response from it.
+        """
         print("Building the multi-prompt chain...", end=' ', flush=True)
         graph = StateGraph(self.State)
         graph.add_node("router_query", self.router_query)
@@ -192,7 +200,8 @@ class LangchainChatter(BaseChatter):
         print("Done.")
 
     def _build_router_chain(self):
-        
+        """Build the router chain for the agent. The chain will be used to route the input query to the appropriate expert based on the router prompt and the available experts.
+        """
         print("Building router chain...", end=' ', flush=True)
         self.route_chain = (
             self._format_chat_prompt(
@@ -201,12 +210,17 @@ class LangchainChatter(BaseChatter):
                     self.router_experts_dict
                     )
                 ) 
-            | self.llm.with_structured_output(RouteQuery)
+            | self.llm.with_structured_output(self.RouteQuery)
         )
         print("Done.")
     
     def _build_rag_chain(self, build_retriever=True, **rag_kwargs):
-        """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context."""
+        """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context.
+        
+        Args:
+            build_retriever (bool): Whether to build the retriever from the context. If False, it will use the existing retriever if available.
+            rag_kwargs (dict): Additional keyword arguments to pass to the RAG chain.
+        """
         print("Building RAG chain...", end=' ', flush=True)
         if build_retriever or not hasattr(self, 'retriever'):
             # Split the context into chunks
@@ -251,7 +265,14 @@ class LangchainChatter(BaseChatter):
     #region Static methods for string/prompt formatting
     @staticmethod
     def _format_router_prompt(prompt, experts):
-        """Format the router prompt with the experts."""
+        """Format the router prompt with the experts.
+        
+        Args:
+            prompt (str): The prompt to format.
+            experts (dict): A dictionary of experts where keys are expert names and values are their descriptions.
+        Returns:
+            str: The formatted prompt with the experts listed.
+        """
         experts_str = "\n".join(["- {}: {}".format(name, desc) 
                                  for name, desc in experts.items()
                                  ])
@@ -259,7 +280,14 @@ class LangchainChatter(BaseChatter):
 
     @staticmethod
     def _format_answer(text: str) -> str:
-        """Remove <think>...</think> blocks and trailing newlines."""
+        """Remove <think>...</think> blocks and trailing newlines.
+        
+        Args:
+            text (str): The text to format.
+        
+        Returns:
+            str: The formatted text with <think> blocks removed and trailing newlines.
+        """
         # Remove all <think>...</think> blocks (including newlines inside)
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
         # Remove leading/trailing whitespace and newlines
@@ -267,6 +295,15 @@ class LangchainChatter(BaseChatter):
 
     @staticmethod
     def _format_chat_prompt(prompt):
+        """Format the chat prompt for the agent.
+        This method creates a ChatPromptTemplate with the given prompt as system message.
+
+        Args:
+            prompt (str): The string to format as system message in the chat prompt.
+
+        Returns:
+            langchain_core.prompts.ChatPromptTemplate: The formatted chat prompt template.
+        """
         return ChatPromptTemplate.from_messages(
             [
                 ("system", prompt),
