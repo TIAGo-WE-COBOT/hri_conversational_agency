@@ -202,30 +202,62 @@ class LangchainChatter(BaseChatter):
         print("Done.")
     
     def _build_rag_chain(self, build_retriever=True):
-        """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context.
+        """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context. 
+        The retriever is built from the context if `build_retriever` is True, otherwise it will use the existing retriever if available. This enables not to rebuild the retriever when only the prompt changes, but the context remains the same.
+        Saved embeddings can be loaded from disk if a `faiss_path` is provided in the `rag_kwargs`.
         
         Args:
             build_retriever (bool): Whether to build the retriever from the context. If False, it will use the existing retriever if available.
             rag_kwargs (dict): Additional keyword arguments to pass to the RAG chain.
         """
         print("Building RAG chain...", end=' ', flush=True)
+        # Unpack kwargs for RAG chain elements
+        text_splitter_kwargs = self.rag_kwargs.get(
+            'text_splitter_kwargs', {})
+        embedding_model_kwargs = self.rag_kwargs.get(
+            'embeddings_model_kwargs', {})
+        faiss_kwargs = self.rag_kwargs.get(
+            'faiss_kwargs', {})
+        # If the retriever has to be built or does not exist, build it
         if build_retriever or not hasattr(self, 'rag_retriever'):
-            # Split the context into chunks
-            text_splitter_kwargs = self.rag_kwargs.get('text_splitter_kwargs',
-                                                        {})
-            text_splitter = RecursiveCharacterTextSplitter(
-                **text_splitter_kwargs
+            # Create embeddings for the context
+            embedding_model = embedding_model_kwargs.pop(
+                    'model_name',
+                    "sentence-transformers/all-mpnet-base-v2"
                 )
-            texts = text_splitter.split_text(self.rag_context)
-            # Create embeddings for the context 
             embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-mpnet-base-v2",
-                model_kwargs=self.rag_kwargs.get('embeddings_kwargs', {}),
+                model_name=embedding_model,
+                model_kwargs=embedding_model_kwargs,
                 )
-            # Create a vector store from the context chunks
-            vector_store = FAISS.from_texts(texts, embeddings)
-            # TODO. Consider logging the context for later inspection of the dialogue
-            # TODO. Allow saving and loading the vector store to/from disk.
+            # Get path to dir to save/load the FAISS index
+            embeddings_dir = os.path.join( 
+                    os.path.dirname(os.path.abspath(__file__)),
+                    '../../../embeddings'
+                )
+            index_dir = faiss_kwargs.get('index_dir', None)
+            index_path = os.path.join(embeddings_dir, index_dir) if index_dir else None
+            if index_dir and os.path.exists(index_path):
+                # If a FAISS path is provided, load the vector store from disk
+                vector_store = FAISS.load_local(
+                    index_path,
+                    embeddings,
+                    allow_dangerous_deserialization=True
+                )
+            else:
+                # Split the context into chunks
+                text_splitter_kwargs = self.rag_kwargs.get(
+                    'text_splitter_kwargs',
+                    {}
+                )
+                text_splitter = RecursiveCharacterTextSplitter(
+                    **text_splitter_kwargs
+                )
+                texts = text_splitter.split_text(self.rag_context)
+                # Create a vector store from the context chunks
+                vector_store = FAISS.from_texts(texts, embeddings)
+                # Save the vector store to disk
+                vector_store.save_local(index_path)
+                # TODO. Consider logging the context for later inspection of the dialogue
             self.rag_retriever = vector_store.as_retriever(
                 search_type="similarity",
                 search_kwargs=self.rag_kwargs.get('retriever_kwargs', {}),

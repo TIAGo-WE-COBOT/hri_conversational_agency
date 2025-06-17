@@ -32,9 +32,10 @@ class ExtendedChatBotNode(ChatBotNode):
             agent_cfg_dict = yaml.safe_load(f)
         # Initialize the agent to generate responses
         self.chatter = LangchainChatter(
-            prompts_dict=agent_cfg_dict["prompts_dict"],
-            router_experts_dict=agent_cfg_dict["router_experts_dict"],
-            rag_context=agent_cfg_dict["rag_context"]
+            prompts_dict=agent_cfg_dict.pop("prompts_dict", {}),
+            router_experts_dict=agent_cfg_dict.pop("router_experts_dict", {}),
+            rag_context=agent_cfg_dict.pop("rag_context", ""),
+            **agent_cfg_dict
         )
         # Initialize the services, publishers and subscribers to interact with the agent via ROS
         self._init_services()

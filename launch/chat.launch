@@ -2,12 +2,12 @@
     <!-- Set the path to the environment -->
     <arg name = "venv"      default = "$(optenv HRI_CONVERSATIONAL_AGENCY_VENV)" />
     <arg name = "backend"   default = "dummy" />
+    <arg name = "agent_cfg_yaml_path" default = "$(find hri_conversational_agency)/cfg/multiprompt_default.yaml" />
     <arg name = "model"     default = "None" />
     <arg name = "model_path"    default = "$(find hri_conversational_agency)/models" />
     <arg name = "ns"        default = "conversational_agent" />
     <arg name = "request_topic"  default = "request"   />
     <arg name = "response_topic" default = "response"  />
-
 
     <!-- Launch the node to chat with the conversational agent -->
     <node pkg = "hri_conversational_agency" type = "chat.py" name = "chat" ns="$(arg ns)"
@@ -19,6 +19,7 @@
     <node pkg = "hri_conversational_agency" type = "chat_extended.py" name = "chat" ns="$(arg ns)"
     output = "screen" launch-prefix="$(arg venv)"
     if="$(eval backend == 'langchain')">
+        <param name = "agent_cfg_yaml_path" value = "$(arg agent_cfg_yaml_path)" />
         <remap from = "request"   to = "$(arg request_topic)" />
         <remap from = "response"  to = "$(arg response_topic)" />
     </node>

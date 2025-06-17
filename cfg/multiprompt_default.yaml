@@ -41,8 +41,10 @@ rag_kwargs:
   text_splitter_kwargs:
     chunk_size: 500
     chunk_overlap: 100
-  embeddings_kwargs:
+  embedding_model_kwargs:
     model_name: "sentence-transformers/all-mpnet-base-v2"
     device: cpu
-  retriever_kwargs:
-    k: 3
+  faiss_kwargs:
+    index_dir: faiss_index_last
+    search_kwargs:
+      k: 3
