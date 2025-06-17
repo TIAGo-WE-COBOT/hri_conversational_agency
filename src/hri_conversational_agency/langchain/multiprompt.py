@@ -271,16 +271,34 @@ class LangchainChatter(BaseChatter):
         return prompt.format(experts=experts_str)
     @staticmethod
     def _format_answer(text: str) -> str:
-        """Remove <think>...</think> blocks and trailing newlines.
+        """Remove <think>...</think> blocks, emojis, and trailing newlines.
         
         Args:
             text (str): The text to format.
         
         Returns:
-            str: The formatted text with <think> blocks removed and trailing newlines.
+            str: The formatted text with <think> blocks and emojis removed, and trailing newlines.
         """
         # Remove all <think>...</think> blocks (including newlines inside)
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        # Remove emojis
+        emoj = re.compile("["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U000024C2-\U0001F251"
+        u"\U0001f926-\U0001f937"
+        u"\U00010000-\U0010ffff"
+        u"\u2600-\u2B55"
+        u"\u200d"
+        u"\u23cf"
+        u"\u23e9"
+        u"\u231a"
+        u"\ufe0f"  # dingbats
+        u"\u3030"
+                      "]+", re.UNICODE)
+        text = re.sub(emoj, '', text)
         # Remove leading/trailing whitespace and newlines
         return text.strip() + '\n\n'
 
@@ -301,4 +319,16 @@ class LangchainChatter(BaseChatter):
                 ("human", "{input}"),
             ]
         )
+    
+    @staticmethod
+    def _remove_emojis(text: str) -> str:
+        """Remove emojis from the given text.
+
+        Args:
+            text (str): A string that may contain emojis.
+
+        Returns:
+            str: The input string with emojis removed.
+        """
+
     #endregion
