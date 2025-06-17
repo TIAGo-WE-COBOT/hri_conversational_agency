@@ -49,6 +49,23 @@ This package is a container for ROS modules, developed for easy integration of c
     ollama pull llama3.2:3b
     ```
 
+#### Ollama and Langchain
+* Install Ollama as per instructions in [Installation/Backend/Ollama](#ollama) section.
+* Install Langchain and its required components
+    ```
+    TODO.
+    ```
+* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat_extended.py` node out-of-the-box, you have to pull the model used as default first. To do so:
+    * Start Ollama
+    ```
+    ollama serve
+    ```
+    and let it run
+    * In a different terminal, run
+    ```
+    ollama pull qwen3:4b
+    ```
+
 <!--
 #### GPT4All
 
@@ -103,6 +120,22 @@ TODO. See Issues.
 
 * You can now check the model behavior as done for the [dummy backend](#dummy).
 
+#### _Ollama + Langchain_ backend
+* Run Ollama with
+    ```
+    ollama serve
+    ```
+    and let it run.
+
+* In another terminal, run `chat_extended.py`
+    ```
+    rosrun hri_conversational_agency chat_extended.py
+    ```
+
+* You can now check the model behavior as done for the [dummy backend](#dummy). 
+Specifically the `chat_extended.py` script imports the [`multiprompt.py`](./src/hri_conversational_agency/langchain/multiprompt.py) which in turn implements a multi-prompt chain, _i.e._ a chain that call an LLM repeatedly, first to route the user input to the proper downstream chain, and then to generate the answer.
+<br>The two downstream chains are implemented as a Retrieval-Augmented Generation model, and a chat model respectively. The behavior of the two chains is controlled via their prompts and context, which can be modified by settin a ROS paramete with the filepath of a YAML file with the same structure as [`multiprompt_default.yaml`](./cfg/multiprompt_default.yaml).
+
 <!--
 ## Troubleshooting
 
@@ -125,8 +158,10 @@ The error is tracked in this [Github issue](https://github.com/openai/openai-pyt
 >[!IMPORTANT]
 > The below services are currently implemented for Ollama backend only. If called with a different backend, the `success` field in the returned response will be `False`.
 
-* `set_sys_prompt` (`hri_conversational_agency/SetSystemPrompt.srv`)
+* `set_sys_prompt` (`hri_conversational_agency/SetAgentContent.srv`)
     <br>Set system prompt for the model.
-* `set_history` (`hri_conversational_agency/History.srv`) 
+* `set_history` (`hri_conversational_agency/SetHistory.srv`) 
     <br>Set chat history for the model. If called with an empty `history` field, resets the model "memory".
+* `set_context` (`hri_conversational_agency/SetAgentContent.srv`)
+    <br>Set context for the model.
 
