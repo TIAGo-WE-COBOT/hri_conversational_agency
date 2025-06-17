@@ -141,11 +141,9 @@ class LangchainChatter(BaseChatter):
         Args:
             history ([(str, str)]): List of tuples (role, content) to set the history of the agent.
         """
-        raise NotImplementedError()
         self.messages = [{'role': role, 'content': content} 
                          for role, content in history
                          if role in ['user', 'assistant', 'system']]
-        # TODO. Return the history as set (?).
 
     def set_sys_prompt(self, prompt):
         """Receive a prompt to set the router prompt of the agent. Any previous system prompt will be deleted.
