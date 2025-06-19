@@ -1,50 +1,48 @@
-# Set the system prompt for each chain in the multiprompt system.
-prompts_dict:
-  router_prompt: |
+model:
+  model: "qwen3:4b"
+  # See: https://python.langchain.com/api_reference/ollama/chat_models/langchain_ollama.chat_models.ChatOllama.html for a complete list of available parameters.
+  temperature: 0.1
+  max_tokens: 1000
+  top_p: 0.95
+  top_k: 40
+
+router:
+  prompt: |
     You are an assistant who has to choose which expert to route the question to.
     Experts are: 
     {experts}
     Based on the question, choose the expert that is most relevant to answer it. Respond with the name of the expert only.
     /no_think
 
-  rag_prompt: |
+rag:
+  description: |
+    answers questions about history, historical events, periods, figures and culture.
+  prompt: |
     You are a helpful assistant. Here is the conversation so far:
     {history}
     Answer all questions to the best of your ability, using the provided context. Context: {context} 
     /no_think
+  context:
+    type: "text" # only text is supported for now
+    content: |
+      This expert only answers in capital letters in the same language of the question.
+  text_splitter:
+    chunk_size: 500
+    chunk_overlap: 100
+  embedding_model:
+    model_name: "sentence-transformers/all-mpnet-base-v2"
+    device: cpu
+  faiss:
+    index_dir: faiss_index_last
+    search:
+      k: 3
                     
-  fallback_prompt: |
+fallback:
+  description: |
+    answers on general questions, when no expert is found.
+  prompt: |
     You are a helpful assistant. Here is the conversation so far: 
     {history}
     Answer all questions to the best of your ability. 
     /no_think
-
-# List the experts (i.e. chains) available in the system.
-router_experts_dict:
-  rag: |
-    answers questions about history, historical events, periods, figuresm and culture.
-  fallback: |
-    answers on general questions, when no expert is found.
-
-# Define context to pass to the RAG expert.
-rag_context: |
-  This expert only answers in capital letters in the same language of the question.
-
-# Set the LLM parameters. See: https://python.langchain.com/api_reference/ollama/chat_models/langchain_ollama.chat_models.ChatOllama.html for a complete list of available parameters.
-model_kwargs:
-  temperature: 0.1
-  max_tokens: 1000
-  top_p: 0.95
-  top_k: 40
-
-rag_kwargs:
-  text_splitter_kwargs:
-    chunk_size: 500
-    chunk_overlap: 100
-  embedding_model_kwargs:
-    model_name: "sentence-transformers/all-mpnet-base-v2"
-    device: cpu
-  faiss_kwargs:
-    index_dir: faiss_index_last
-    search_kwargs:
-      k: 3
+  
