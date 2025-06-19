@@ -58,6 +58,7 @@ add_service_files(
   FILES
   SetHistory.srv
   SetAgentContent.srv
+  SetAgentConfig.srv
 )
 
 ## Generate actions in the 'action' folder

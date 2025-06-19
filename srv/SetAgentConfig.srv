@@ -1,0 +1,4 @@
+string yaml_path  # filepath of the configuration YAML
+---
+bool success
+string status
