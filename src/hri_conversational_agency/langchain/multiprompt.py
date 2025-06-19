@@ -4,6 +4,7 @@ A conversational agent that generates responses to user input based on Ollama mo
 
 import os
 import re
+import yaml
 from operator import itemgetter
 from typing import Literal
 from typing_extensions import TypedDict
@@ -37,45 +38,30 @@ class LangchainChatter(BaseChatter):
                             #   'content': 'message content'
                             # }
 
-    def __init__(self, model='qwen3:4b', prompts_dict=None,
-     router_experts_dict=None, rag_context=None, **kwargs):
+    def __init__(self, config):
         """Initialize the LangchainChatter object.
 
         Args:
             model (str, optional): The name of the model to use for the Ollama agent. Defaults to 'qwen3:4b'.
             The model should be available in the Ollama server. You can check the available models with `ollama list` and retrieve the model with `ollama pull <model_name>` if needed.
         """
+        # Initialize the agent "memory"
+        self.set_history([])
+        # Load the configuration from the YAML file
+        self.llm_cfg = {}
+        self.router_cfg = {}
+        self.rag_cfg = {}
+        self.fallback_cfg = {}
+        self.set_config(config)
         # Initialize the logger to store the dialogue history
-        self.log = Logger(agent_name='langchain - ' + model)
+        self.log = Logger(
+            agent_name='langchain - ' + self.llm_cfg["model"])
         self.log.logfile_open()
-        # Initialize the LLMs
-        self.llm = ChatOllama(model=model,
-                              model_kwargs=kwargs.pop('model_kwargs', {}),
-                              )
-        self.messages = [] # chat history, to be used for model "memory"
-        # Set prompt and available "experts" for the routing chain. The experts are defined as a dictionary where the keys are the expert names and the values are their descriptions.
-        self.router_prompt = prompts_dict["router_prompt"]
-        self.router_experts_dict = router_experts_dict
-        self._build_router_chain()
-        # Set prompt and context for the Retrieval-Augmented Generation (RAG) chain.
-        self.rag_prompt = prompts_dict["rag_prompt"]
-        self.rag_context = rag_context
-        self.rag_kwargs = kwargs.pop('rag_kwargs', {})
-        self._build_rag_chain(build_retriever=True)
-        # Set the fallback prompt for an simple chat model that will be used when no relevant context is found.
-        self.fallback_prompt = prompts_dict["fallback_prompt"]
-        self._build_fallback_chain()
-        # Build the multi-prompt chain that will
-        # 1) Select the "expert" via the router_chain, and collect the answer
-        # alongside the input query.
-        # 2) Route the input query to the proper chain, based on the
-        # selection.
-        self._build_app()
         print("Ready to chat!")
     
     # region StateGraph nodes definition
     def router_query(self, state: State, config: RunnableConfig):
-            destination = self.route_chain.invoke(state["query"], config)
+            destination = self.router_chain.invoke(state["query"], config)
             return {"destination": destination}
     
     def rag_query(self, state: State, config: RunnableConfig):
@@ -88,7 +74,7 @@ class LangchainChatter(BaseChatter):
 
     def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query"]:
         destination = state["destination"]["destination"].lower()
-        if destination in [key for key in self.router_experts_dict.keys()]:
+        if destination in [key for key in self.router_cfg["experts"].keys()]:
             return destination + '_query'
         else:
             print("No expert found for destination: {}".format(destination))
@@ -123,18 +109,65 @@ class LangchainChatter(BaseChatter):
         )
         return response
 
-    def set_context(self, context):
-        """Receive a context string to set the context of the agent. The context will be used to inform the agent's responses."""
-        self.rag_context = context
-        self._build_rag_chain(build_retriever=True)
+    def _merge_dicts_recursive(self, old, new):
+        merged = old.copy()
+        for k, v in new.items():
+            if (
+                k in merged
+                and isinstance(merged[k], dict)
+                and isinstance(v, dict)
+            ):
+                merged[k] = self._merge_dicts_recursive(merged[k], v)
+            else:
+                merged[k] = v
+        return merged
+
+    def set_config(self, yaml_path):
+        """Receive filepath to a YAML file containing the configuration of the agent. The YAML file should contain the model name, the router prompt, the RAG context, and the fallback prompt."""
+        with open(yaml_path, 'r', encoding='utf-8') as f:
+            cfg = yaml.safe_load(f)
+        # 1. Handle LLM config
+        llm_cfg = self._merge_dicts_recursive(self.llm_cfg,
+                                              cfg.pop("model", {}))
+        if llm_cfg != self.llm_cfg: 
+            # If the LLM config has changed, rebuild the LLM
+            self.llm_cfg = llm_cfg
+            self._build_llm()
+        # 2. Handle router config
+        router_cfg = cfg.pop("router", {})
+        experts_dict = {}
+        for chain, kwargs in cfg.items(): 
+            # Parse remaining entries in the config to see if they are "experts" for the router chain.
+            if "description" not in kwargs:
+                continue
+            experts_dict[chain] = kwargs["description"]
+        router_cfg["experts"] = experts_dict
+        router_cfg = self._merge_dicts_recursive(self.router_cfg, 
+                                                 router_cfg)
+        if router_cfg != self.router_cfg: 
+            # If the router config has changed, rebuild the LLM
+            self.router_cfg = router_cfg
+            self._build_router_chain()
+        # 3. Handle RAG config
+        rag_cfg = self._merge_dicts_recursive(self.rag_cfg,
+                                              cfg.pop("rag", {}))
+        if rag_cfg != self.rag_cfg:
+            self.rag_cfg = rag_cfg
+            self._build_rag_chain()
+        # 4. Handle fallback chat config
+        fallback_cfg = self._merge_dicts_recursive(self.fallback_cfg,
+                                                  cfg.pop("fallback", {}))
+        if fallback_cfg != self.fallback_cfg:
+            # If the fallback config has changed, rebuild the fallback chain
+            self.fallback_cfg = fallback_cfg
+            self._build_fallback_chain()
+        # Build the multi-prompt chain that will
+        # 1) Select the "expert" via the router_chain, and collect the answer
+        # alongside the input query.
+        # 2) Route the input query to the proper chain, based on the
+        # selection.
         self._build_app()
     
-    def set_rag_prompt(self, prompt):
-        """Set the RAG prompt for the agent. The prompt will be used to format the input query into the respective prompt, run it through a chat model, and cast the result to a string."""
-        self.rag_prompt = prompt
-        self._build_rag_chain(build_retriever=False)
-        self._build_app()
-
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. Any previous history will be overwritten.
 
@@ -144,29 +177,6 @@ class LangchainChatter(BaseChatter):
         self.messages = [{'role': role, 'content': content} 
                          for role, content in history
                          if role in ['user', 'assistant', 'system']]
-
-    def set_sys_prompt(self, prompt):
-        """Receive a prompt to set the router prompt of the agent. Any previous system prompt will be deleted.
-        
-        Args:
-            prompt (str): String to set as the system prompt of the router chain.
-        """
-        self.router_prompt = prompt
-        self._build_router_chain()
-        self._build_app()
-
-    def set_fallback_prompt(self, prompt):
-        """Set the fallback prompt for the agent. The prompt will be used when the agent cannot find a relevant context.
-        
-        Args:
-            prompt (str): The system prompt to set for the fallback agent.
-        """
-        self.fallback_prompt = prompt
-        self._build_fallback_chain()
-        self._build_app()
-    
-    def on_shutdown(self):
-        self.log.logfile_close()
     #endregion
 
     #region Chain objects definition
@@ -190,78 +200,66 @@ class LangchainChatter(BaseChatter):
         """Build the router chain for the agent. The chain will be used to route the input query to the appropriate expert based on the router prompt and the available experts.
         """
         print("Building router chain...", end=' ', flush=True)
-        self.route_chain = (
+        # Set prompt and available "experts" for the routing chain. The experts are defined as a dictionary where the keys are the expert names and the values are their descriptions.
+        self.router_chain = (
             self._format_chat_prompt(
                 self._format_router_prompt(
-                    self.router_prompt, 
-                    self.router_experts_dict
+                    self.router_cfg["prompt"], 
+                    self.router_cfg["experts"]
                     )
                 ) 
             | self.llm.with_structured_output(self.RouteQuery)
         )
         print("Done.")
     
-    def _build_rag_chain(self, build_retriever=True):
+    def _build_rag_chain(self):
         """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context. 
-        The retriever is built from the context if `build_retriever` is True, otherwise it will use the existing retriever if available. This enables not to rebuild the retriever when only the prompt changes, but the context remains the same.
         Saved embeddings can be loaded from disk if a `faiss_path` is provided in the `rag_kwargs`.
-        
-        Args:
-            build_retriever (bool): Whether to build the retriever from the context. If False, it will use the existing retriever if available.
-            rag_kwargs (dict): Additional keyword arguments to pass to the RAG chain.
         """
         print("Building RAG chain...", end=' ', flush=True)
         # Unpack kwargs for RAG chain elements
-        text_splitter_kwargs = self.rag_kwargs.get(
-            'text_splitter_kwargs', {})
-        embedding_model_kwargs = self.rag_kwargs.get(
-            'embeddings_model_kwargs', {})
-        faiss_kwargs = self.rag_kwargs.get(
-            'faiss_kwargs', {})
-        # If the retriever has to be built or does not exist, build it
-        if build_retriever or not hasattr(self, 'rag_retriever'):
-            # Create embeddings for the context
-            embedding_model = embedding_model_kwargs.pop(
-                    'model_name',
-                    "sentence-transformers/all-mpnet-base-v2"
-                )
-            embeddings = HuggingFaceEmbeddings(
-                model_name=embedding_model,
-                model_kwargs=embedding_model_kwargs,
-                )
-            # Get path to dir to save/load the FAISS index
-            embeddings_dir = os.path.join( 
-                    os.path.dirname(os.path.abspath(__file__)),
-                    '../../../embeddings'
-                )
-            index_dir = faiss_kwargs.get('index_dir', None)
-            index_path = os.path.join(embeddings_dir, index_dir) if index_dir else None
-            if index_dir and os.path.exists(index_path):
-                # If a FAISS path is provided, load the vector store from disk
-                vector_store = FAISS.load_local(
-                    index_path,
-                    embeddings,
-                    allow_dangerous_deserialization=True
-                )
-            else:
-                # Split the context into chunks
-                text_splitter_kwargs = self.rag_kwargs.get(
-                    'text_splitter_kwargs',
-                    {}
-                )
-                text_splitter = RecursiveCharacterTextSplitter(
-                    **text_splitter_kwargs
-                )
-                texts = text_splitter.split_text(self.rag_context)
-                # Create a vector store from the context chunks
-                vector_store = FAISS.from_texts(texts, embeddings)
-                # Save the vector store to disk
-                vector_store.save_local(index_path)
-                # TODO. Consider logging the context for later inspection of the dialogue
-            self.rag_retriever = vector_store.as_retriever(
-                search_type="similarity",
-                search_kwargs=self.rag_kwargs.get('retriever_kwargs', {}),
+        text_splitter_kwargs = self.rag_cfg.get('text_splitter', {})
+        embedding_model_kwargs = self.rag_cfg.get('embedding_model', {})
+        faiss_kwargs = self.rag_cfg.get('faiss', {})
+        # Create embeddings for the context
+        embedding_model = embedding_model_kwargs.pop(
+                'model_name',
+                "sentence-transformers/all-mpnet-base-v2"
             )
+        embeddings = HuggingFaceEmbeddings(
+            model_name=embedding_model,
+            model_kwargs=embedding_model_kwargs,
+            )
+        # Get path to dir to save/load the FAISS index
+        embeddings_dir = os.path.join( 
+                os.path.dirname(os.path.abspath(__file__)),
+                '../../../embeddings'
+            )
+        index_dir = faiss_kwargs.get('index_dir', None)
+        index_path = os.path.join(embeddings_dir, index_dir) if index_dir else None
+        if index_dir and os.path.exists(index_path):
+            # If a FAISS path is provided, load the vector store from disk
+            vector_store = FAISS.load_local(
+                index_path,
+                embeddings,
+                allow_dangerous_deserialization=True
+            )
+        else: # Otherwise, create a new vector store (and save it)
+            # Split the context into chunks
+            text_splitter_kwargs = self.rag_cfg.get('text_splitter',{})
+            text_splitter = RecursiveCharacterTextSplitter(
+                **text_splitter_kwargs
+            )
+            texts = text_splitter.split_text(self.rag_cfg["context"]["content"])
+            # Create a vector store from the context chunks
+            vector_store = FAISS.from_texts(texts, embeddings)
+            # Save the vector store to disk
+            vector_store.save_local(index_path)
+            # TODO. Consider logging the context for later inspection of the dialogue
+        self.rag_retriever = vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs=faiss_kwargs.get('search', {}),
+        )
         # Build the RAG chain using the retriever and the prompt
         self.rag_chain = (
             {
@@ -269,7 +267,7 @@ class LangchainChatter(BaseChatter):
                 "input": itemgetter("input"),
                 "history": itemgetter("history")          
             }
-            | self._format_chat_prompt(self.rag_prompt)
+            | self._format_chat_prompt(self.rag_cfg["prompt"])
             | self.llm
             | StrOutputParser()
         )
@@ -279,11 +277,17 @@ class LangchainChatter(BaseChatter):
         """Build the fallback chain for the agent. The chain will be used to generate a response when no relevant context is found."""
         print("Building fallback chain...", end=' ', flush=True)
         self.fallback_chain = (
-            self._format_chat_prompt(self.fallback_prompt) 
+            self._format_chat_prompt(self.fallback_cfg["prompt"]) 
             | self.llm 
             | StrOutputParser()
         )
         print("Done.")
+    
+    def _build_llm(self):
+        llm_cfg = self.llm_cfg.copy()
+        self.llm = ChatOllama(model=llm_cfg.pop("model"),
+                              **llm_cfg,
+                            )
     #endregion
     
     #region Static methods for string/prompt formatting
