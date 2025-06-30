@@ -25,7 +25,7 @@ class LangchainChatter(BaseChatter):
     # Define schema for multi-prompt chain output
     class RouteQuery(TypedDict):
         """Route query to destination expert."""
-        destination: Literal["rag", "fallback"]
+        destination: Literal["rag", "fallback", "weather", "datetime"]
     # For LangGraph, we will define the state of the graph to hold the query,
     # destination, and final answer.
     class State(TypedDict):
@@ -71,8 +71,14 @@ class LangchainChatter(BaseChatter):
     def fallback_query(self, state: State, config: RunnableConfig):
         return {"answer": self.fallback_chain.invoke({"input": state["query"],
                                                  "history": state["history"]}, config)}
+    
+    def weather_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.weather_chain()}
 
-    def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query"]:
+    def datetime_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.datetime_chain()}
+
+    def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query", "weather_query", "datetime_query"]:
         destination = state["destination"]["destination"].lower()
         if destination in [key for key in self.router_cfg["experts"].keys()]:
             return destination + '_query'
@@ -161,12 +167,30 @@ class LangchainChatter(BaseChatter):
             # If the fallback config has changed, rebuild the fallback chain
             self.fallback_cfg = fallback_cfg
             self._build_fallback_chain()
+        
+        # 5. Handle weather tool config
+        weather_cfg = self._merge_dicts_recursive(
+            getattr(self, 'weather_cfg', {}),
+            cfg.pop("weather", {})
+        )
+        self.weather_cfg = weather_cfg
+        self._build_tool_weather_chain()
+        
+        # 6. Handle date tool config  
+        datetime_cfg = self._merge_dicts_recursive(
+            getattr(self, 'datetime_cfg', {}),
+            cfg.pop("datetime", {})
+        )
+        self.datetime_cfg = datetime_cfg
+        self._build_tool_datetime_chain()
+
         # Build the multi-prompt chain that will
         # 1) Select the "expert" via the router_chain, and collect the answer
         # alongside the input query.
         # 2) Route the input query to the proper chain, based on the
         # selection.
         self._build_app()
+        return True 
     
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. Any previous history will be overwritten.
@@ -188,6 +212,15 @@ class LangchainChatter(BaseChatter):
         graph.add_node("router_query", self.router_query)
         graph.add_node("rag_query", self.rag_query)
         graph.add_node("fallback_query", self.fallback_query)
+
+        # Add tool nodes if they exist
+        if hasattr(self, 'weather_chain'):
+            graph.add_node("weather_query", self.weather_query)
+            graph.add_edge("weather_query", END)
+
+        if hasattr(self, 'datetime_chain'):
+            graph.add_node("datetime_query", self.datetime_query)
+            graph.add_edge("datetime_query", END)
 
         graph.add_edge(START, "router_query")
         graph.add_conditional_edges("router_query", self.router_select_node)
@@ -288,6 +321,20 @@ class LangchainChatter(BaseChatter):
         self.llm = ChatOllama(model=llm_cfg.pop("model"),
                               **llm_cfg,
                             )
+        
+    def _build_tool_weather_chain(self): # TODO. Implement translation
+        """Build the weather chain for the agent. The chain will be used to retrieve current weather information for a specified location."""
+        print("Building weather chain...", end=' ', flush=True)
+        from hri_conversational_agency.langchain.tools import get_weather_info
+        self.weather_chain = lambda: get_weather_info("Lecco")
+        print("Done.")
+
+    def _build_tool_datetime_chain(self):   # TODO. Implement translation
+        """Build the datetime chain for the agent. The chain will be used to retrieve current date, month, and season information."""
+        print("Building datetime chain...", end=' ', flush=True)
+        from hri_conversational_agency.langchain.tools import get_datetime_info
+        self.datetime_chain = lambda: get_datetime_info()
+        print("Done.")
     #endregion
     
     #region Static methods for string/prompt formatting

@@ -45,4 +45,11 @@ fallback:
     {history}
     Answer all questions to the best of your ability. 
     /no_think
-  
+
+weather:
+  description: |
+    provides current weather information for the specified location.
+
+datetime:
+  description: |
+    provides current date, month, and season information.
