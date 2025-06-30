@@ -48,44 +48,12 @@ class LangchainChatter(BaseChatter):
         # Initialize the agent "memory"
         self.set_history([])
         # Load the configuration from the YAML file
-        self.llm_cfg = {}
-        self.router_cfg = {}
-        self.rag_cfg = {}
-        self.fallback_cfg = {}
         self.set_config(config)
         # Initialize the logger to store the dialogue history
         self.log = Logger(
             agent_name='langchain - ' + self.llm_cfg["model"])
         self.log.logfile_open()
         print("Ready to chat!")
-    
-    # region StateGraph nodes definition
-    def router_query(self, state: State, config: RunnableConfig):
-            destination = self.router_chain.invoke(state["query"], config)
-            return {"destination": destination}
-    
-    def rag_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.rag_chain.invoke({"input": state["query"],
-                                                 "history": state["history"]}, config)}
-
-    def fallback_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.fallback_chain.invoke({"input": state["query"],
-                                                 "history": state["history"]}, config)}
-    
-    def weather_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.weather_chain()}
-
-    def datetime_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.datetime_chain()}
-
-    def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query", "weather_query", "datetime_query"]:
-        destination = state["destination"]["destination"].lower()
-        if destination in [key for key in self.router_cfg["experts"].keys()]:
-            return destination + '_query'
-        else:
-            print("No expert found for destination: {}".format(destination))
-            return "fallback_query"
-    #endregion
 
     #region ROS interface methods
     def generate_response(self, request):
@@ -115,31 +83,13 @@ class LangchainChatter(BaseChatter):
         )
         return response
 
-    def _merge_dicts_recursive(self, old, new):
-        merged = old.copy()
-        for k, v in new.items():
-            if (
-                k in merged
-                and isinstance(merged[k], dict)
-                and isinstance(v, dict)
-            ):
-                merged[k] = self._merge_dicts_recursive(merged[k], v)
-            else:
-                merged[k] = v
-        return merged
-
     def set_config(self, yaml_path):
         """Receive filepath to a YAML file containing the configuration of the agent. The YAML file should contain the model name, the router prompt, the RAG context, and the fallback prompt."""
         with open(yaml_path, 'r', encoding='utf-8') as f:
             cfg = yaml.safe_load(f)
-        # 1. Handle LLM config
-        llm_cfg = self._merge_dicts_recursive(self.llm_cfg,
-                                              cfg.pop("model", {}))
-        if llm_cfg != self.llm_cfg: 
-            # If the LLM config has changed, rebuild the LLM
-            self.llm_cfg = llm_cfg
-            self._build_llm()
-        # 2. Handle router config
+        # 1. Set/Update LLM config
+        self._update_cfg(cfg.pop("model", {}), "llm", self._build_llm)
+        # 2. Set/Update router config
         router_cfg = cfg.pop("router", {})
         experts_dict = {}
         for chain, kwargs in cfg.items(): 
@@ -148,41 +98,13 @@ class LangchainChatter(BaseChatter):
                 continue
             experts_dict[chain] = kwargs["description"]
         router_cfg["experts"] = experts_dict
-        router_cfg = self._merge_dicts_recursive(self.router_cfg, 
-                                                 router_cfg)
-        if router_cfg != self.router_cfg: 
-            # If the router config has changed, rebuild the LLM
-            self.router_cfg = router_cfg
-            self._build_router_chain()
-        # 3. Handle RAG config
-        rag_cfg = self._merge_dicts_recursive(self.rag_cfg,
-                                              cfg.pop("rag", {}))
-        if rag_cfg != self.rag_cfg:
-            self.rag_cfg = rag_cfg
-            self._build_rag_chain()
-        # 4. Handle fallback chat config
-        fallback_cfg = self._merge_dicts_recursive(self.fallback_cfg,
-                                                  cfg.pop("fallback", {}))
-        if fallback_cfg != self.fallback_cfg:
-            # If the fallback config has changed, rebuild the fallback chain
-            self.fallback_cfg = fallback_cfg
-            self._build_fallback_chain()
-        
-        # 5. Handle weather tool config
-        weather_cfg = self._merge_dicts_recursive(
-            getattr(self, 'weather_cfg', {}),
-            cfg.pop("weather", {})
-        )
-        self.weather_cfg = weather_cfg
-        self._build_tool_weather_chain()
-        
-        # 6. Handle date tool config  
-        datetime_cfg = self._merge_dicts_recursive(
-            getattr(self, 'datetime_cfg', {}),
-            cfg.pop("datetime", {})
-        )
-        self.datetime_cfg = datetime_cfg
-        self._build_tool_datetime_chain()
+        self._update_cfg(router_cfg, "router", self._build_router_chain)
+        # 3. Set/Update configs for LLM-based chains
+        self._update_cfg(cfg.pop("rag", {}), "rag", self._build_rag_chain)
+        self._update_cfg(cfg.pop("fallback", {}), "fallback", self._build_fallback_chain)
+        # 4. Set/Update configs for "tool" chains (i.e. Python functions not running on an LLM)
+        self._update_cfg(cfg.pop("weather", {}), "weather", self._build_tool_weather_chain)
+        self._update_cfg(cfg.pop("datetime", {}), "datetime", self._build_tool_datetime_chain)
 
         # Build the multi-prompt chain that will
         # 1) Select the "expert" via the router_chain, and collect the answer
@@ -203,6 +125,34 @@ class LangchainChatter(BaseChatter):
                          if role in ['user', 'assistant', 'system']]
     #endregion
 
+    # region StateGraph nodes definition
+    def router_query(self, state: State, config: RunnableConfig):
+            destination = self.router_chain.invoke(state["query"], config)
+            return {"destination": destination}
+    
+    def rag_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.rag_chain.invoke({"input": state["query"],
+                                                 "history": state["history"]}, config)}
+
+    def fallback_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.fallback_chain.invoke({"input": state["query"],
+                                                 "history": state["history"]}, config)}
+    
+    def weather_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.weather_chain()}
+
+    def datetime_query(self, state: State, config: RunnableConfig):
+        return {"answer": self.datetime_chain()}
+
+    def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query", "weather_query", "datetime_query"]:
+        destination = state["destination"]["destination"].lower()
+        if destination in [key for key in self.router_cfg["experts"].keys()]:
+            return destination + '_query'
+        else:
+            print("No expert found for destination: {}".format(destination))
+            return "fallback_query"
+    #endregion
+    
     #region Chain objects definition
     def _build_app(self):
         """Build the multi-prompt chain for the agent. The chain will be used to route the input query to the appropriate expert, and invoke a response from it.
@@ -326,17 +276,74 @@ class LangchainChatter(BaseChatter):
         """Build the weather chain for the agent. The chain will be used to retrieve current weather information for a specified location."""
         print("Building weather chain...", end=' ', flush=True)
         from hri_conversational_agency.langchain.tools import get_weather_info
-        self.weather_chain = lambda: get_weather_info("Lecco")
+        self.weather_chain = lambda: get_weather_info(
+            location = self.weather_cfg.get('location', None),
+            lang = self.weather_cfg.get('lang', 'en')
+        )
         print("Done.")
 
     def _build_tool_datetime_chain(self):   # TODO. Implement translation
         """Build the datetime chain for the agent. The chain will be used to retrieve current date, month, and season information."""
         print("Building datetime chain...", end=' ', flush=True)
         from hri_conversational_agency.langchain.tools import get_datetime_info
-        self.datetime_chain = lambda: get_datetime_info()
+        self.datetime_chain = lambda: get_datetime_info(
+            lang = self.datetime_cfg.get('lang', 'en')
+        )
         print("Done.")
     #endregion
     
+    #region Helper methods for setting agent configuration
+    def _merge_dicts_recursive(self, old, new):
+        """Recursively merge two dictionaries.
+        Behavior:
+        * a key exists in both dictionaries: the value from `new` will overwrite the value from `old`.
+        * a key exists in `old` but not in `new`: the value from `old` will be kept.
+        * a key exists in `new` but not in `old`: the value from `new` will be added to `old`.
+        The behavior is applied recursively for nested dictionaries.
+
+        Args:
+            old (dict): The existing dictionary to merge into.
+            new (dict): The new dictionary to merge from.
+
+        Returns:
+            dict: The merged dictionary.
+        """
+        merged = old.copy()
+        for k, v in new.items():
+            if (
+                k in merged
+                and isinstance(merged[k], dict)
+                and isinstance(v, dict)
+            ):
+                merged[k] = self._merge_dicts_recursive(merged[k], v)
+            else:
+                merged[k] = v
+        return merged
+    
+    def _update_cfg(self, new_cfg, cfg_key, builder_method):
+        """Helper method to check, merge, and rebuild config sections.
+        
+        Args:
+            new_cfg (dict): The new config dictionary to merge.
+            cfg_key (str): The config key (e.g., "model", "router", "rag").
+            builder_method (callable): The method to call if config changed (e.g., self._build_llm).
+        
+        Returns:
+            bool: True if the config was updated and rebuilt. False otherwise.
+        """
+        cfg_var_name = cfg_key + "_cfg"
+
+        merged_cfg = self._merge_dicts_recursive(
+            getattr(self, cfg_var_name, {}),
+            new_cfg
+        )
+        
+        if not hasattr(self, cfg_var_name) or merged_cfg != getattr(self, cfg_var_name, {}):
+            setattr(self, cfg_var_name, merged_cfg)
+            builder_method()
+            return True
+        return False
+
     #region Static methods for string/prompt formatting
     @staticmethod
     def _format_router_prompt(prompt, experts):

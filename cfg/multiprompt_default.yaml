@@ -49,7 +49,10 @@ fallback:
 weather:
   description: |
     provides current weather information for the specified location.
+  location: "New York"
+  language: "en" # ["en", "it"]
 
 datetime:
   description: |
     provides current date, month, and season information.
+  language: "en" # ["en", "it"]
