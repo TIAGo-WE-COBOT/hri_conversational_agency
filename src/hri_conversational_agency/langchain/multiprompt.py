@@ -259,10 +259,21 @@ class LangchainChatter(BaseChatter):
     def _build_fallback_chain(self):
         """Build the fallback chain for the agent. The chain will be used to generate a response when no relevant context is found."""
         print("Building fallback chain...", end=' ', flush=True)
+        # Get the prompt and handle optional variables
+        prompt = self.fallback_cfg["prompt"]
+        
+        # Check if {interests} is in the prompt and substitute if not provided
+        if "{interests}" in prompt:
+            interests_list = self.fallback_cfg.get("interests", [])
+            if interests_list:
+                interests_str = "Your interests include: " + ", ".join(interests_list) + "."
+            else:
+                interests_str = ""
+            prompt = prompt.replace("{interests}", interests_str)
         self.fallback_chain = (
-            self._format_chat_prompt(self.fallback_cfg["prompt"]) 
+            self._format_chat_prompt(prompt) 
             | self.llm 
-            | StrOutputParser()
+        | StrOutputParser()
         )
         print("Done.")
     

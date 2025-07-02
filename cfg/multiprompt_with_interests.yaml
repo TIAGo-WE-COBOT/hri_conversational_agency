@@ -43,8 +43,13 @@ fallback:
   prompt: |
     You are a helpful assistant. Here is the conversation so far: 
     {history}.
+    This are the user interests: {interests}.
     Answer all questions to the best of your ability. 
     /no_think
+  interests:
+    - "history"
+    - "technology"
+    - "sports"
 
 weather:
   description: |
