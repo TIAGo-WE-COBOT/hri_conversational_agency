@@ -289,7 +289,7 @@ class LangchainChatter(BaseChatter):
         from hri_conversational_agency.langchain.tools import get_weather_info
         self.weather_chain = lambda: get_weather_info(
             location = self.weather_cfg.get('location', None),
-            lang = self.weather_cfg.get('lang', 'en')
+            lang = self.weather_cfg.get('language', 'en')
         )
         print("Done.")
 
@@ -298,7 +298,7 @@ class LangchainChatter(BaseChatter):
         print("Building datetime chain...", end=' ', flush=True)
         from hri_conversational_agency.langchain.tools import get_datetime_info
         self.datetime_chain = lambda: get_datetime_info(
-            lang = self.datetime_cfg.get('lang', 'en')
+            lang = self.datetime_cfg.get('language', 'en')
         )
         print("Done.")
     #endregion

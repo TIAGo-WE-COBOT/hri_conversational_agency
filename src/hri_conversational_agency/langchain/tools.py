@@ -32,8 +32,9 @@ weather_msgs = {
 
 datetime_msgs = {
     "en": {
-        "output_template": "Today is {weekday} {month} {day}, {year}. It is currently {season}.",
+        "output_template": "Today is {weekday} {month} {day}, {year}. It is {hour}:{minute}. It is currently {season}.",
         "error_template": "Sorry, could not get date information.",
+        "hour_period": 12, # i.e. AM/PM format
         "weekday": [
             "Monday", "Tuesday", "Wednesday", "Thursday", "Friday","Saturday", "Sunday"
                     ],
@@ -48,8 +49,9 @@ datetime_msgs = {
         }
     },
     "it": {
-        "output_template": "Oggi è {weekday} {day} {month} {year}. È {season}.",
+        "output_template": "Oggi è {weekday} {day} {month} {year}. Sono le {hour} e {minute} minuti. È {season}.",
         "error_template": "Spiacente, non è stato possibile ottenere informazioni sulla data.",
+        "hour_period": 24, # i.e. 24-hour format
         "weekday": [
             "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato", "domenica"
         ],
@@ -70,6 +72,7 @@ def get_weather_info(location: str = None, lang: str = "en") -> str:
     
     Args:
         location (str): The location to get weather for
+        lang (str): Language code for output (default is 'en' for English). Currently supports 'en' and 'it'.
         
     Returns:
         str: Weather information as a formatted string
@@ -99,6 +102,7 @@ def get_datetime_info(date_str: str = None, lang: str = "en") -> str:
     
     Args:
         date_str (str, optional): Date string in YYYY-MM-DD format. If None, uses current date.
+        lang (str): Language code for output (default is 'en' for English). Currently supports 'en' and 'it'.
         
     Returns:
         str: Date and season information as a formatted string
@@ -118,11 +122,22 @@ def get_datetime_info(date_str: str = None, lang: str = "en") -> str:
             season = "summer"
         else:
             season = "autumn"
+        # Format the hour based on `hour_period`
+        if datetime_msgs[lang]["hour_period"] == 12:
+            hour = date_obj.hour % 12 or 12
+            minute = date_obj.minute 
+            minute += "AM" if date_obj.hour < 12 else "PM"
+        else:
+            hour = date_obj.hour
+            minute = date_obj.minute
+        # Format the output based on language (see `datetime_msgs` dictionary)
         return datetime_msgs[lang]["output_template"].format(
             weekday=datetime_msgs[lang]["weekday"][date_obj.weekday()],
             month=datetime_msgs[lang]["month"][date_obj.month - 1],
             day=date_obj.day,
             year=year,
+            hour=hour,
+            minute=minute,
             season=datetime_msgs[lang]["season"][season]
         )
     except Exception as e:
