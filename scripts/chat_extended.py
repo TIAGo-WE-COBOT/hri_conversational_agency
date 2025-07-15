@@ -25,7 +25,7 @@ class ExtendedChatBotNode(ChatBotNode):
         # Get the agent configuration from the YAML file
         agent_cfg_yaml_path = rospy.get_param(
             '~agent_cfg_yaml_path',
-            os.path.join(pkg_root, 'cfg', 'multiprompt_default.yaml')
+            os.path.join(pkg_root, 'cfg', 'multiprompt_demo_historian.yaml')
         )
         # Initialize the agent to generate responses
         self.chatter = LangchainChatter(

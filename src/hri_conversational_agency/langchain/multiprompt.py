@@ -15,17 +15,21 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama import ChatOllama
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableConfig, RunnablePassthrough, RunnableLambda
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 
 from hri_conversational_agency.base import BaseChatter
 from hri_conversational_agency.logger import Logger
+import hri_conversational_agency.langchain.tools as tools_utils
+            
 
 class LangchainChatter(BaseChatter):
+    SYSTEM_COMPONENTS = ['llm', 'router'] # these components might have associated configurations (i.e. `_cfg` attributes) or chains (i.e. `_chain` attributes) but they are not considered "expert" chains, and treated in a special way.
     # Define schema for multi-prompt chain output
     class RouteQuery(TypedDict):
         """Route query to destination expert."""
-        destination: Literal["rag", "fallback", "weather", "datetime"]
+        destination: str  # Dynamic - will be updated based on available chains
+    
     # For LangGraph, we will define the state of the graph to hold the query,
     # destination, and final answer.
     class State(TypedDict):
@@ -34,7 +38,7 @@ class LangchainChatter(BaseChatter):
         answer: str
         history: list[dict] # list of messages in the format 
                             # {
-                            #   'role': 'system'/'user'/'assistant', 
+                            #   'role': 'system' | 'user' |'assistant', 
                             #   'content': 'message content'
                             # }
 
@@ -42,10 +46,9 @@ class LangchainChatter(BaseChatter):
         """Initialize the LangchainChatter object.
 
         Args:
-            model (str, optional): The name of the model to use for the Ollama agent. Defaults to 'qwen3:4b'.
-            The model should be available in the Ollama server. You can check the available models with `ollama list` and retrieve the model with `ollama pull <model_name>` if needed.
+            config (str): Path to YAML configuration file
         """
-        # Initialize the agent "memory"
+        # Initialize the agent (empty) memory
         self.set_history([])
         # Load the configuration from the YAML file
         self.set_config(config)
@@ -70,49 +73,46 @@ class LangchainChatter(BaseChatter):
         # Generate the response
         state = self.app.invoke({"query": request, "history": self.messages})
         response = self._format_answer(state["answer"])
-        # Add the reponse to the messages to maintain the chat history
-        # Update history
+        # Add the response to the messages to maintain the chat history
         self.messages += [
             {'role': 'user', 'content': request},
             {'role': 'assistant', 'content': response}
         ]
         # Log the output for later inspection of the dialogue
-        self.log.log_output("[{}] {}".format(
-            state["destination"]["destination"].lower(),
-            response)
-        )
+        self.log.log_output(f"[{state['destination']['destination'].lower()}] {response}")
         return response
 
     def set_config(self, yaml_path):
-        """Receive filepath to a YAML file containing the configuration of the agent. The YAML file should contain the model name, the router prompt, the RAG context, and the fallback prompt."""
+        """Receive filepath to a YAML file containing the configuration of the agent."""
         with open(yaml_path, 'r', encoding='utf-8') as f:
             cfg = yaml.safe_load(f)
-        # 1. Set/Update LLM config
+        # 1. Set/Update LLM config (always required)
         self._update_cfg(cfg.pop("model", {}), "llm", self._build_llm)
-        # 2. Set/Update router config
+        # 2. Get chains configuration
+        chains_dict = cfg.pop("chains", [])
+        # 3. Set/Update router config with extracted experts
         router_cfg = cfg.pop("router", {})
-        experts_dict = {}
-        for chain, kwargs in cfg.items(): 
-            # Parse remaining entries in the config to see if they are "experts" for the router chain.
-            if "description" not in kwargs:
-                continue
-            experts_dict[chain] = kwargs["description"]
+        experts_dict = {name: chain_cfg["description"] 
+                       for name, chain_cfg in chains_dict.items() 
+                       if "description" in chain_cfg}
         router_cfg["experts"] = experts_dict
         self._update_cfg(router_cfg, "router", self._build_router_chain)
-        # 3. Set/Update configs for LLM-based chains
-        self._update_cfg(cfg.pop("rag", {}), "rag", self._build_rag_chain)
-        self._update_cfg(cfg.pop("fallback", {}), "fallback", self._build_fallback_chain)
-        # 4. Set/Update configs for "tool" chains (i.e. Python functions not running on an LLM)
-        self._update_cfg(cfg.pop("weather", {}), "weather", self._build_tool_weather_chain)
-        self._update_cfg(cfg.pop("datetime", {}), "datetime", self._build_tool_datetime_chain)
-
-        # Build the multi-prompt chain that will
-        # 1) Select the "expert" via the router_chain, and collect the answer
-        # alongside the input query.
-        # 2) Route the input query to the proper chain, based on the
-        # selection.
+        # 4. Set/Update each chain configuration
+        for chain_name, chain_config in chains_dict.items():
+            type_to_builder = {
+                'rag': self._build_rag_chain,
+                'chat': self._build_chat_chain,
+                'tool': lambda: self._build_tool_chain(chain_name),
+            }
+            builder_method = type_to_builder.get(chain_config.get('type', None), None)
+            if builder_method:
+                self._update_cfg(chain_config, chain_name, builder_method)
+            else:
+                print("Warning: No builder method found for chain '{}'".format(chain_name))
+        # 5. Set/Update RouteQuery destinations and build the app
+        self._update_route_query_destinations()
         self._build_app()
-        return True 
+        print(dir(self))
     
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. Any previous history will be overwritten.
@@ -127,61 +127,128 @@ class LangchainChatter(BaseChatter):
 
     # region StateGraph nodes definition
     def router_query(self, state: State, config: RunnableConfig):
-            destination = self.router_chain.invoke(state["query"], config)
-            return {"destination": destination}
+        """Invoke the router chain to determine the destination expert for the input query.
+        
+        Args:
+            state (State): The current state of the graph containing the input query and history.
+            config (RunnableConfig): Runtime configuration for the router chain invocation.
+        
+        Returns:
+            dict: A dictionary with the destination expert for the query.
+        """
+        destination = self.router_chain.invoke(state["query"], config)
+        return {"destination": destination}
     
-    def rag_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.rag_chain.invoke({"input": state["query"],
-                                                 "history": state["history"]}, config)}
+    def chat_query(self, state: State, config: RunnableConfig):
+        """Invoke the chat chain to generate a response based on the input query and history.
 
-    def fallback_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.fallback_chain.invoke({"input": state["query"],
-                                                 "history": state["history"]}, config)}
-    
-    def weather_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.weather_chain()}
+        Args:
+            state (State):The current state of the graph containing the input query and history.
+            config (RunnableConfig): Runtime configuration for the chat chain invocation.
 
-    def datetime_query(self, state: State, config: RunnableConfig):
-        return {"answer": self.datetime_chain()}
-
-    def router_select_node(self, state: State) -> Literal["rag_query", "fallback_query", "weather_query", "datetime_query"]:
+        Returns:
+            dict: A dictionary with the generated answer from the chat chain.
+        """
         destination = state["destination"]["destination"].lower()
-        if destination in [key for key in self.router_cfg["experts"].keys()]:
-            return destination + '_query'
+        chain = getattr(self, f"{destination}_chain")
+        return {"answer": chain.invoke({"input": state["query"],
+                                         "history": state["history"]}, config)}
+
+    def rag_query(self, state: State, config: RunnableConfig):
+        """Invoke the RAG chain to retrieve relevant information from context and generate an answer based on the input query and history.
+
+        Args:
+            state (State): The current state of the graph containing the input query and history.
+            config (RunnableConfig): Runtime configuration for the RAG chain invocation.
+
+        Returns:
+            dict: A dictionary with the generated answer from the RAG chain.
+        """
+        destination = state["destination"]["destination"].lower()
+        chain = getattr(self, f"{destination}_chain")
+        return {"answer": chain.invoke({"input": state["query"],
+                                         "history": state["history"]}, config)}
+
+    def tool_query(self, state: State, config: RunnableConfig):
+        """Invoke a tool chain based on the destination specified in the state.
+
+        Args:
+            state (State): The current state of the graph containing the input query and destination.
+            config (RunnableConfig): Runtime configuration for the tool chain invocation.
+        
+        Returns:
+            dict: A dictionary with the answer from the invoked tool chain.
+        """
+        destination = state["destination"]["destination"].lower()
+        
+        # Get the appropriate tool chain
+        tool_chain = getattr(self, f"{destination}_chain", None)
+        if tool_chain:
+            return {"answer": tool_chain()}
         else:
-            print("No expert found for destination: {}".format(destination))
-            return "fallback_query"
+            return {"answer": f"Tool '{destination}' not available."}
+
+    def router_select_node(self, state: State):
+        """Route to available chains dynamically.
+        
+        Args:
+            state (State): The current state of the graph containing the destination.
+
+        Returns:
+            str: The name of the next node to route to based on the destination.
+        """
+        destination = state["destination"]["destination"].lower()
+        # Check if the requested chain actually exists
+        print("Routing to destination:", destination)
+        if hasattr(self, f"{destination}_chain"):
+            return f"{destination}_query"
+        else:
+            raise ValueError(
+                f"Chain '{destination}' not available. Available chains: {[attr_name for attr_name in dir(self) if attr_name.endswith('_chain')]}"
+            )
     #endregion
     
     #region Chain objects definition
     def _build_app(self):
-        """Build the multi-prompt chain for the agent. The chain will be used to route the input query to the appropriate expert, and invoke a response from it.
-        """
+        """Build the multi-prompt chain with only available chains."""
         print("Building the multi-prompt chain...", end=' ', flush=True)
         graph = StateGraph(self.State)
+        # Always add router
         graph.add_node("router_query", self.router_query)
-        graph.add_node("rag_query", self.rag_query)
-        graph.add_node("fallback_query", self.fallback_query)
-
-        # Add tool nodes if they exist
-        if hasattr(self, 'weather_chain'):
-            graph.add_node("weather_query", self.weather_query)
-            graph.add_edge("weather_query", END)
-
-        if hasattr(self, 'datetime_chain'):
-            graph.add_node("datetime_query", self.datetime_query)
-            graph.add_edge("datetime_query", END)
-
         graph.add_edge(START, "router_query")
+        # Discover all available chains dynamically
+        available_chains = []
+        # Find all attributes ending with '_chain'
+        for attr_name in dir(self):
+            if attr_name.endswith('_chain') and not attr_name.startswith('_') and not attr_name[:-6] in LangchainChatter.SYSTEM_COMPONENTS:
+                chain_name = attr_name[:-6] # remove suffix '_chain'
+                # Determine the query method based on chain type from config
+                chain_cfg = getattr(self, f"{chain_name}_cfg", {})
+                chain_type = chain_cfg.get("type")
+                query_method = getattr(self, f"{chain_type}_query", None)
+                if not query_method:
+                    print(f"Unknown chain type for '{chain_name}', skipping")
+                    continue
+                # Add the chain node and edge
+                graph.add_node(f"{chain_name}_query", query_method)
+                graph.add_edge(f"{chain_name}_query", END)
+                available_chains.append(chain_name)
+        # Add conditional routing
         graph.add_conditional_edges("router_query", self.router_select_node)
-        graph.add_edge("rag_query", END)
-        graph.add_edge("fallback_query", END)
+        # Build the app with the defined graph
         self.app = graph.compile()
-        print("Done.")
+        print(f"Done. Available chains: {available_chains}")
+    
+    def _build_llm(self):
+        """Build the LLM instance from configuration."""
+        llm_cfg = self.llm_cfg.copy()
+        self.llm = ChatOllama(
+            model=llm_cfg.pop("model"),
+            **llm_cfg,
+        )
 
     def _build_router_chain(self):
-        """Build the router chain for the agent. The chain will be used to route the input query to the appropriate expert based on the router prompt and the available experts.
-        """
+        """Build the router chain for the agent. The chain will be used to route the input query to the appropriate expert based on the router prompt and the available experts."""
         print("Building router chain...", end=' ', flush=True)
         # Set prompt and available "experts" for the routing chain. The experts are defined as a dictionary where the keys are the expert names and the values are their descriptions.
         self.router_chain = (
@@ -189,8 +256,8 @@ class LangchainChatter(BaseChatter):
                 self._format_router_prompt(
                     self.router_cfg["prompt"], 
                     self.router_cfg["experts"]
-                    )
-                ) 
+                )
+            ) 
             | self.llm.with_structured_output(self.RouteQuery)
         )
         print("Done.")
@@ -199,25 +266,29 @@ class LangchainChatter(BaseChatter):
         """Build the RAG chain for the agent. The chain will be used to retrieve relevant context from the vector store and generate a response based on the context. 
         Saved embeddings can be loaded from disk if a `faiss_path` is provided in the `rag_kwargs`.
         """
-        print("Building RAG chain...", end=' ', flush=True)
+        # Get the current chain name being built
+        current_chain = getattr(self, '_current_chain_name', 'rag')
+        print(f"Building {current_chain} (RAG) chain...", end=' ', flush=True)
+        # Use the specific chain's config
+        chain_cfg = getattr(self, f"{current_chain}_cfg")
         # Unpack kwargs for RAG chain elements
-        text_splitter_kwargs = self.rag_cfg.get('text_splitter', {})
-        embedding_model_kwargs = self.rag_cfg.get('embedding_model', {})
-        faiss_kwargs = self.rag_cfg.get('faiss', {})
+        text_splitter_kwargs = chain_cfg.get('text_splitter', {})
+        embedding_model_kwargs = chain_cfg.get('embedding_model', {})
+        faiss_kwargs = chain_cfg.get('faiss', {})
         # Create embeddings for the context
         embedding_model = embedding_model_kwargs.pop(
-                'model_name',
-                "sentence-transformers/all-mpnet-base-v2"
-            )
+            'model_name',
+            "sentence-transformers/all-mpnet-base-v2"
+        )
         embeddings = HuggingFaceEmbeddings(
             model_name=embedding_model,
             model_kwargs=embedding_model_kwargs,
-            )
+        )
         # Get path to dir to save/load the FAISS index
         embeddings_dir = os.path.join( 
-                os.path.dirname(os.path.abspath(__file__)),
-                '../../../embeddings'
-            )
+            os.path.dirname(os.path.abspath(__file__)),
+            '../../../embeddings'
+        )
         index_dir = faiss_kwargs.get('index_dir', None)
         index_path = os.path.join(embeddings_dir, index_dir) if index_dir else None
         if index_dir and os.path.exists(index_path):
@@ -229,82 +300,132 @@ class LangchainChatter(BaseChatter):
             )
         else: # Otherwise, create a new vector store (and save it)
             # Split the context into chunks
-            text_splitter_kwargs = self.rag_cfg.get('text_splitter',{})
-            text_splitter = RecursiveCharacterTextSplitter(
-                **text_splitter_kwargs
-            )
-            texts = text_splitter.split_text(self.rag_cfg["context"]["content"])
+            text_splitter = RecursiveCharacterTextSplitter(**text_splitter_kwargs)
+            texts = text_splitter.split_text(chain_cfg["context"]["content"])
             # Create a vector store from the context chunks
             vector_store = FAISS.from_texts(texts, embeddings)
             # Save the vector store to disk
-            vector_store.save_local(index_path)
-            # TODO. Consider logging the context for later inspection of the dialogue
-        self.rag_retriever = vector_store.as_retriever(
+            if index_path:
+                vector_store.save_local(index_path)
+        # Create a retriever from the vector store
+        retriever = vector_store.as_retriever(
             search_type="similarity",
             search_kwargs=faiss_kwargs.get('search', {}),
         )
         # Build the RAG chain using the retriever and the prompt
-        self.rag_chain = (
+        rag_chain = (
             {
-                "context": itemgetter("input") | self.rag_retriever,
+                "context": itemgetter("input") | retriever,
                 "input": itemgetter("input"),
                 "history": itemgetter("history")          
             }
-            | self._format_chat_prompt(self.rag_cfg["prompt"])
+            | self._format_chat_prompt(chain_cfg["prompt"])
             | self.llm
             | StrOutputParser()
         )
+        # Store the chain with the specific name
+        setattr(self, f"{current_chain}_chain", rag_chain)
         print("Done.")
 
-    def _build_fallback_chain(self):
-        """Build the fallback chain for the agent. The chain will be used to generate a response when no relevant context is found."""
-        print("Building fallback chain...", end=' ', flush=True)
+    def _build_chat_chain(self):
+        """Build a chat chain for the agent.
+        """
+        # Get the current chain name being built
+        current_chain = getattr(self, '_current_chain_name', 'fallback')
+        print(f"Building {current_chain} (chat) chain...", end=' ', flush=True)
+        # Use the specific chain's config
+        chain_cfg = getattr(self, f"{current_chain}_cfg")
         # Get the prompt and handle optional variables
-        prompt = self.fallback_cfg["prompt"]
-        
+        prompt = chain_cfg["prompt"]
         # Check if {interests} is in the prompt and substitute if not provided
         if "{interests}" in prompt:
-            interests_list = self.fallback_cfg.get("interests", [])
+            interests_list = chain_cfg.get("interests", [])
             if interests_list:
                 interests_str = "Your interests include: " + ", ".join(interests_list) + "."
             else:
                 interests_str = ""
             prompt = prompt.replace("{interests}", interests_str)
-        self.fallback_chain = (
+        # Build the chat chain
+        chat_chain = (
             self._format_chat_prompt(prompt) 
             | self.llm 
-        | StrOutputParser()
+            | StrOutputParser()
         )
+        # Store the chain with the specific name
+        setattr(self, f"{current_chain}_chain", chat_chain)
         print("Done.")
     
-    def _build_llm(self):
-        llm_cfg = self.llm_cfg.copy()
-        self.llm = ChatOllama(model=llm_cfg.pop("model"),
-                              **llm_cfg,
-                            )
+    def _build_tool_chain(self, tool_name):
+        """Build a tool chain for a tool identified by name in config."""
+        print(f"Building {tool_name} (tool) chain...", end=' ', flush=True)
+        # Get the tool configuration
+        tool_cfg = getattr(self, f"{tool_name}_cfg", {})
+        # Get tool class from the tool name
+        tool_class = tools_utils.get_tool_class(tool_name)
+        # If the tool exists, build the chain
+        if tool_class:
+            # Build the tool chain using the tool class
+            tool_chain = tool_class.build_chain(tool_cfg)
+            # Store the chain as class attribute
+            setattr(self, f"{tool_name}_chain", tool_chain)
+            print("Done.")
+        else:
+            print("Failed - tool class not found for {}".format(tool_name))
         
-    def _build_tool_weather_chain(self): # TODO. Implement translation
-        """Build the weather chain for the agent. The chain will be used to retrieve current weather information for a specified location."""
-        print("Building weather chain...", end=' ', flush=True)
-        from hri_conversational_agency.langchain.tools import get_weather_info
-        self.weather_chain = lambda: get_weather_info(
-            location = self.weather_cfg.get('location', None),
-            lang = self.weather_cfg.get('language', 'en')
-        )
-        print("Done.")
-
-    def _build_tool_datetime_chain(self):   # TODO. Implement translation
-        """Build the datetime chain for the agent. The chain will be used to retrieve current date, month, and season information."""
-        print("Building datetime chain...", end=' ', flush=True)
-        from hri_conversational_agency.langchain.tools import get_datetime_info
-        self.datetime_chain = lambda: get_datetime_info(
-            lang = self.datetime_cfg.get('language', 'en')
-        )
-        print("Done.")
     #endregion
     
-    #region Helper methods for setting agent configuration
-    def _merge_dicts_recursive(self, old, new):
+    # region Helper methods for configuration and chain building
+    def _update_cfg(self, new_cfg, cfg_key, builder_method):
+        """Helper method to check, merge, and rebuild config sections.
+        
+        Args:
+            new_cfg (dict): The new config dictionary to merge.
+            cfg_key (str): The config key (e.g., "model", "router", "rag").
+            builder_method (callable): The method to call if config changed (e.g., self._build_llm).
+        
+        Returns:
+            bool: True if the config was updated and rebuilt. False otherwise.
+        """
+        cfg_var_name = cfg_key + "_cfg" # name to be assigned to config variable
+        # Check if the config variable exists, if not create it
+        merged_cfg = self._merge_dicts_recursive(
+            getattr(self, cfg_var_name, {}),
+            new_cfg
+        )
+        # # If the config has changed, update the config variable and rebuild the chain
+        if not hasattr(self, cfg_var_name) or merged_cfg != getattr(self, cfg_var_name, {}):
+            # Update the config variable
+            setattr(self, cfg_var_name, merged_cfg)
+            # Set the current chain name for the builder to use
+            self._current_chain_name = cfg_key
+            builder_method()
+            # Clean up
+            delattr(self, '_current_chain_name')
+            return True
+        return False
+    
+    def _update_route_query_destinations(self):
+        """Update RouteQuery destinations based on available chains."""
+        available_chains = []
+        # Find chains dynamically by checking attributes ending with '_cfg'
+        for attr_name in dir(self):
+            if attr_name.endswith('_cfg') and not attr_name.startswith('_'):
+                chain_name = attr_name[:-4]  # Remove '_cfg' suffix
+                # Skip system configs (as `llm_cfg`, or `router_cfg`)
+                if chain_name in LangchainChatter.SYSTEM_COMPONENTS:
+                    continue    
+                # Check if the actual chain object exists too
+                if hasattr(self, f"{chain_name}_chain"):
+                    available_chains.append(chain_name)
+        # Update the Literal type dynamically
+        if available_chains:
+            self.RouteQuery.__annotations__["destination"] = Literal[tuple(available_chains)]
+            print(f"Updated RouteQuery destinations: {available_chains}")
+        else:
+            print("WARNING: No available chains found for RouteQuery!")
+    
+    @staticmethod
+    def _merge_dicts_recursive(old, new):
         """Recursively merge two dictionaries.
         Behavior:
         * a key exists in both dictionaries: the value from `new` will overwrite the value from `old`.
@@ -326,34 +447,11 @@ class LangchainChatter(BaseChatter):
                 and isinstance(merged[k], dict)
                 and isinstance(v, dict)
             ):
-                merged[k] = self._merge_dicts_recursive(merged[k], v)
+                merged[k] = LangchainChatter._merge_dicts_recursive(merged[k], v)
             else:
                 merged[k] = v
         return merged
-    
-    def _update_cfg(self, new_cfg, cfg_key, builder_method):
-        """Helper method to check, merge, and rebuild config sections.
-        
-        Args:
-            new_cfg (dict): The new config dictionary to merge.
-            cfg_key (str): The config key (e.g., "model", "router", "rag").
-            builder_method (callable): The method to call if config changed (e.g., self._build_llm).
-        
-        Returns:
-            bool: True if the config was updated and rebuilt. False otherwise.
-        """
-        cfg_var_name = cfg_key + "_cfg"
-
-        merged_cfg = self._merge_dicts_recursive(
-            getattr(self, cfg_var_name, {}),
-            new_cfg
-        )
-        
-        if not hasattr(self, cfg_var_name) or merged_cfg != getattr(self, cfg_var_name, {}):
-            setattr(self, cfg_var_name, merged_cfg)
-            builder_method()
-            return True
-        return False
+    # endregion
 
     #region Static methods for string/prompt formatting
     @staticmethod
@@ -366,10 +464,10 @@ class LangchainChatter(BaseChatter):
         Returns:
             str: The formatted prompt with the experts listed.
         """
-        experts_str = "\n".join(["- {}: {}".format(name, desc) 
-                                 for name, desc in experts.items()
-                                 ])
+        experts_str = "\n".join([f"- {name}: {desc}" 
+                             for name, desc in experts.items()])
         return prompt.format(experts=experts_str)
+    
     @staticmethod
     def _format_answer(text: str) -> str:
         """Remove <think>...</think> blocks, emojis, and trailing newlines.
@@ -400,6 +498,7 @@ class LangchainChatter(BaseChatter):
         u"\u3030"
                       "]+", re.UNICODE)
         text = re.sub(emoj, '', text)
+        text = text.replace('*', ' ')  # remove asterisks
         # Remove leading/trailing whitespace and newlines
         return text.strip() + '\n\n'
 
@@ -420,16 +519,4 @@ class LangchainChatter(BaseChatter):
                 ("human", "{input}"),
             ]
         )
-    
-    @staticmethod
-    def _remove_emojis(text: str) -> str:
-        """Remove emojis from the given text.
-
-        Args:
-            text (str): A string that may contain emojis.
-
-        Returns:
-            str: The input string with emojis removed.
-        """
-
     #endregion
