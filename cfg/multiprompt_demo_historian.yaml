@@ -17,7 +17,8 @@ router:
 
 #memory: True | False # enable or disable memory
 
-#incremental: True | False # if True, the agent is updated keeping the same structure, and modifying the specified settings. If False, the agent is completely reloaded with the new settings.
+incremental: False  # True | False 
+                    # If True, the agent is updated keeping the same structure, and modifying the specified settings. If False, the agent is completely reloaded with the new settings.
 
 chains:
   historian:
