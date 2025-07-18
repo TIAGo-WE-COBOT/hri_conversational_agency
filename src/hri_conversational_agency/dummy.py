@@ -43,41 +43,5 @@ class DummyChatter(BaseChatter):
         self.log.log_output(response)
         return response
 
-    def set_context(self, context):
-        """Receive a string to set the context for the agent. The method is not implemented in this class, as the dummy agent does not have any history. The method is only here to comply with the interface of the other agents.
-        The method will raise a NotImplementedError if called.
-
-        Args:
-            context (str): String to set the context of the agent.
-
-        Raises:
-            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot know any context.
-        """
-        raise NotImplementedError("The dummy agent cannot implement any context, it is just a script reader.")
-
-    def set_history(self, history):
-        """Receive a list of tuples (role, content) to set the history of the agent. The method is not implemented in this class, as the dummy agent does not have any history. The method is only here to comply with the interface of the other agents.
-        The method will raise a NotImplementedError if called.
-
-        Args:
-            history ([(str, str)]): List of tuples (role, content) to set the history of the agent.
-
-        Raises:
-            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot have any history.
-        """
-        raise NotImplementedError("The dummy agent cannot implement any history, it is just a script reader.")
-
-    def set_sys_prompt(self, prompt):
-        """Receive a string to set the system prompt of the agent. The method is not implemented in this class, as the dummy agent does not have any system prompt. The method is only here to comply with the interface of the other agents.
-        The method will raise a NotImplementedError if called.
-
-        Args:
-            prompt (str): String to set the system prompt of the agent.
-
-        Raises:
-            NotImplementedError: The method is only here to comply with the interface of the other agents. The dummy agent cannot have any system prompt.
-        """
-        raise NotImplementedError("The dummy agent cannot implement any system prompt, it is just a script reader.")
-
     def on_shutdown(self):
         self.log.logfile_close()

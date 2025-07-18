@@ -9,13 +9,13 @@ class BaseChatter(ABC):
         pass
 
     def set_context(self, context):
-        raise NotImplementedError
+        raise NotImplementedError("The set_context method is not implemented in this class.")
 
     def set_history(self, history):
-        raise NotImplementedError
+        raise NotImplementedError("The set_history method is not implemented in this class.")
 
     def set_sys_prompt(self, prompt):
-        raise NotImplementedError
+        raise NotImplementedError("The set_sys_prompt method is not implemented in this class.")
 
     def on_shutdown(self):
         pass
