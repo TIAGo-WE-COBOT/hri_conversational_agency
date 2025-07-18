@@ -433,18 +433,14 @@ class LangchainChatter(BaseChatter):
     def _build_tool_chain(self, tool_name):
         """Build a tool chain for a tool identified by name in config."""
         print(f"Building {tool_name} (tool) chain...", end=' ', flush=True)
-        
         # Get the tool configuration
         tool_cfg = getattr(self, f"{tool_name}_cfg", {})
-        
         # Check if tools are available
         if not TOOLS_AVAILABLE or not tools_utils:
             print("Failed - tools module not available")
             return
-        
         # Get tool class from the tool name
         tool_class = tools_utils.get_tool_class(tool_name)
-        
         # If the tool exists, build the chain
         if tool_class:
             # Build the tool chain using the tool class
@@ -454,7 +450,7 @@ class LangchainChatter(BaseChatter):
             self._register_chain(tool_name)
             print("Done.")
         else:
-            print(f"Failed - tool class not found for {tool_name}")
+            print(f"Tool class not found for {tool_name}")
     #endregion
     
     #region Helper methods for configuration and chain building
@@ -470,30 +466,24 @@ class LangchainChatter(BaseChatter):
             bool: True if the config was updated and rebuilt. False otherwise.
         """
         cfg_var_name = cfg_key + "_cfg"
-        
         # Get existing config
         existing_cfg = getattr(self, cfg_var_name, {})
-        
         # Merge configs
         merged_cfg = self._merge_dicts_recursive(existing_cfg, new_cfg)
-        
         # Check if config actually changed
         if merged_cfg != existing_cfg:
             print(f"  Updating {cfg_key} configuration...")
-            
             # Update the config variable and register it
             setattr(self, cfg_var_name, merged_cfg)
             self._register_config(cfg_key)
-            
             # Set the current chain name for the builder to use
             self._current_chain_name = cfg_key
-            
             try:
                 builder_method()
-                print(f"  ✅ {cfg_key} updated successfully")
+                print(f"{cfg_key} updated successfully")
                 return True
             except Exception as e:
-                print(f"  ❌ Failed to update {cfg_key}: {e}")
+                print(f"Failed to update {cfg_key}: {e}")
                 return False
             finally:
                 # Clean up
