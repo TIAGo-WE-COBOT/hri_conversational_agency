@@ -1,0 +1,17 @@
+<launch>
+    <!-- Set the path to the environment -->
+    <arg name = "venv"      default = "$(optenv HRI_CONVERSATIONAL_AGENCY_VENV)" />
+    <arg name = "backend"   default = "dummy" /> <!-- dummy | ollama -->
+    <arg name = "model"     default = "llama3.2:3b" />
+    <arg name = "ns"        default = "conversational_agent" />
+    <arg name = "request_topic"  default = "request"   />
+    <arg name = "response_topic" default = "response"  />
+
+    <!-- Launch the node to chat with the conversational agent -->
+    <node pkg = "hri_conversational_agency" type = "chat_simple.py" name = "chat" ns="$(arg ns)"
+    output = "screen" launch-prefix="$(arg venv)" 
+    args = "--backend $(arg backend) --model $(arg model)">
+        <remap from = "request"   to = "$(arg request_topic)" />
+        <remap from = "response"  to = "$(arg response_topic)" />
+    </node>
+</launch>

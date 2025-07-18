@@ -8,7 +8,7 @@ import os
 import rospy
 import rospkg
 
-from chat import ChatBotNode
+from chat_simple import ChatBotNode
 from hri_conversational_agency.langchain.multiprompt import LangchainChatter
 from hri_conversational_agency.srv import SetAgentConfig, SetAgentConfigResponse
 

@@ -2,6 +2,25 @@
 
 This package is a container for ROS modules, developed for easy integration of conversational agents in ROS.
 
+---
+
+## Table of contents
+- [Installation](#installation)
+    - [Ollama](#ollama)
+    - [Ollama and Langchain](#ollama-and-langchain)
+- [How to use](#how-to-use)
+    - [Simple chat](#simple-chat)
+        - [Dummy backend](#dummy-backend)
+        - [Ollama backend](#ollama-backend)
+    - [Advanced chat (Langchain-based agents)](#advanced-chat-langchain-based-agents)
+        - [Multiprompt chain](#multiprompt-chain)
+        - [Configuration](#configuration)
+- [ROS interface](#ros-interface)
+    - [Topics](#topics)
+    - [Services](#services)
+
+---
+
 ## Installation
 
 * Open a terminal and move to the `src` folder of your workspace (here assumed to be `~/hri_ws`)
@@ -12,11 +31,6 @@ This package is a container for ROS modules, developed for easy integration of c
     ```
     git clone https://github.com/TIAGo-WE-COBOT/hri_conversational_agency.git
     ```
-<!--* Install the common requirements with
-    ```
-    pip install -r requirements.txt
-    ```
--->
 * Go back to the root of the workspace and build the package
     ```
     cd ..
@@ -24,11 +38,13 @@ This package is a container for ROS modules, developed for easy integration of c
     ```
 
 > [!IMPORTANT]
-> The above command will not install the requirements for any specific backend. As such, you will only be able to run a pre-scripted bot (`backend=dummy`). <br>
+> The above command will not install the requirements for any specific backend. As such, you will only be able to run the `chat_simple.py`node implementing a pre-scripted bot (`backend=dummy`). <br>
 > See the following section to install specific backend(s).
 
-### Backend
-#### Ollama
+### Ollama
+
+> [!IMPORTANT]
+> This installation is required only if you intend to run `chat_advanced.py` or `chat_simple.py` with `ollama` backend.
 
 * Install Ollama as described in the [docs](https://github.com/ollama/ollama/blob/main/docs/linux.md) with
     ```
@@ -38,7 +54,7 @@ This package is a container for ROS modules, developed for easy integration of c
     ```
     pip install ollama-python
     ```
-* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat.py` node out-of-the-box, you have to pull the model used as default first. To do so:
+* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat_simple.py` node out-of-the-box, you have to pull the model used as default first. To do so:
     * Start Ollama
     ```
     ollama serve
@@ -49,13 +65,17 @@ This package is a container for ROS modules, developed for easy integration of c
     ollama pull llama3.2:3b
     ```
 
-#### Ollama and Langchain
+### Langchain
+
+> [!IMPORTANT]
+> This installation is required only if you intend to run `chat_advanced.py`.
+
 * Install Ollama as per instructions in [Installation/Backend/Ollama](#ollama) section.
 * Install Langchain and its required components
     ```
-    TODO.
+    pip install -qU langchain-core langchain-ollama langgraph
     ```
-* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat_extended.py` node out-of-the-box, you have to pull the model used as default first. To do so:
+* Pull the model you will use with `ollama pull <model>`. To be able to run the `chat_advanced.py` node out-of-the-box, you have to pull the model used as default first. To do so:
     * Start Ollama
     ```
     ollama serve
@@ -66,32 +86,19 @@ This package is a container for ROS modules, developed for easy integration of c
     ollama pull qwen3:4b
     ```
 
-<!--
-#### GPT4All
-
-TODO. See Issues.
-
-#### OpenAI
-
-- Get your API key from [this link](https://platform.openai.com/account/api-keys) and copy it to your clipboard.
-- Create a file named `.env` in the package root, if you do not already have one.
-- Open the `.env` file and add the following line
-    ```
-    OPENAI_API_KEY=<your_api_key>
-    ```
-    where `<your_api_key>` has to be susbstituted with the actual API key obtained at the first step.
-
-> [!IMPORTANT]
-> Make sure that the `.gitignore` file includes a `.env` or `*.env` entry to avoid the file with the API key being tracked by Git. 
--->
+---
 
 ## How to use
 
+### Simple chat
+
+The `chat_simple.py` provides the ROS interface for a simple conversational agent (either based on LLM or on a simpler implementation). Through the ROS interface is it also possible to control some agent's configurations such as conversation history and system prompt.
+
 #### _Dummy_ backend
 
-* Open a terminal (let's call it *T1*), launch `chat.launch` with `backend:=dummy` (default)
+* Open a terminal (let's call it *T1*), launch `chat_simple.launch` with `backend:=dummy` (default)
     ```
-    roslaunch hri_conversational_agency chat.launch
+    roslaunch hri_conversational_agency chat_simple.launch
     ```
 * Open another terminal (*T2*) and start listening to the `/conversational_agent/response` topic
     ```
@@ -113,39 +120,62 @@ TODO. See Issues.
     ```
     and let it run.
 
-* In another terminal, launch `chat.launch` with `backend:=ollama`
+* In another terminal, launch `chat_simple.launch` with `backend:=ollama`
     ```
-    roslaunch hri_conversational_agency chat.launch backend:=ollama
+    roslaunch hri_conversational_agency chat_simple.launch backend:=ollama
     ```
 
 * You can now check the model behavior as done for the [dummy backend](#dummy).
 
-#### _Ollama + Langchain_ backend
+### Advanced chat (Langchain-based agents)
+
+The `chat_advanced.py` provides the ROS interface for agents implemented leveraging on the [Langchain](https://www.langchain.com/) framework to implement more complex agent's behavior. The agent configuration is set via YAML file (see [`cfg` folder](./cfg/)), either passed at launch or via ROS service.
+
+> [!NOTE]
+> At the time of writing this note, only the `multiprompt.py` implementation is available for the `chat_advanced.py` script.
+
+#### Multiprompt chain
+The multiprompt chain implements an **intelligent routing system** that automatically directs user queries to specialized expert chains based on the content and context of the question.
+
+<details><summary>Click here for insight into the `multiprompt` implementation.</summary>
+
+**How it works:**
+1. **User input** → **Router** analyzes the query and selects the best _expert_ (sometimes referred to as _destinations_ in the code).
+2. **Router** → **Expert chain** processes the query using specialized knowledge/tools.
+3. **Expert chain** → **Response** generated using the appropriate method (RAG, chat, or tool).
+
+**Available expert types:**
+- **RAG chains**: Use custom context and document retrieval (e.g., historical knowledge, technical documentation)
+- **Chat chains**: Simple conversational agents with specific personalities or domains
+- **Tool chains**: Execute external functions (weather API, datetime, calculations, etc.)
+
+**Example scenario:**
+
+- User asks *"What's the weather like today?"* → Routes to **weather tool chain**
+- User asks *"Tell me about Napoleon"* → Routes to **historian RAG chain** 
+- User asks *"How are you?"* → Routes to **general chat chain**
+
+The above behavior can be reproduced using the [`multiprompt_demo_historian.yaml`](./cfg/multiprompt_demo_historian.yaml) configuration file.
+</details>
+
 * Run Ollama with
     ```
     ollama serve
     ```
     and let it run.
 
-* In another terminal, run `chat_extended.py`
+* In another terminal, launch the `chat_advanced` node
     ```
-    rosrun hri_conversational_agency chat_extended.py
+    roslaunch hri_conversational_agency chat_advanced.launch
     ```
 
-* You can now check the model behavior as done for the [dummy backend](#dummy). 
-Specifically the `chat_extended.py` script imports the [`multiprompt.py`](./src/hri_conversational_agency/langchain/multiprompt.py) which in turn implements a multi-prompt chain, _i.e._ a chain that call an LLM repeatedly, first to route the user input to the proper downstream chain, and then to generate the answer.
-<br>The two downstream chains are implemented as a Retrieval-Augmented Generation model, and a chat model respectively. The behavior of the two chains is controlled via their prompts and context, which can be modified by settin a ROS paramete with the filepath of a YAML file with the same structure as [`multiprompt_default.yaml`](./cfg/multiprompt_default.yaml).
+* You can now check the model behavior as done for the [dummy backend](#dummy).
 
-<!--
-## Troubleshooting
+---
 
-### - openai.error.AuthenticationError: \<empty message\>
-The error is tracked in this [Github issue](https://github.com/openai/openai-python/issues/464). Try to generate a new API key and replace the existing one.
--->
+## ROS interface
 
-### ROS interface
-
-#### Topics
+### Topics
 
 * Subscribed:
     * `request` (`std_msgs/String`)
@@ -154,14 +184,20 @@ The error is tracked in this [Github issue](https://github.com/openai/openai-pyt
     * `response` (`std_msgs/String`)
         <br>Response message generated by the conversational agent.
 
-#### Services
+### Services
 >[!IMPORTANT]
 > The below services are currently implemented for Ollama backend only. If called with a different backend, the `success` field in the returned response will be `False`.
 
 * `set_sys_prompt` (`hri_conversational_agency/SetAgentContent.srv`)
-    <br>Set system prompt for the model.
+    <br>Set system prompt for the model. Implemented for `chat_simple` only.
 * `set_history` (`hri_conversational_agency/SetHistory.srv`) 
     <br>Set chat history for the model. If called with an empty `history` field, resets the model "memory".
 * `set_context` (`hri_conversational_agency/SetAgentContent.srv`)
-    <br>Set context for the model.
+    <br>Set context for the model. Implemented for `chat_simple` only.
+* `set_config` (`hri_conversation_agency/SetAgentConfig.srv`)
+    <br>Set filepath to a YAML file with the configuration for the `chat_advanced` agent. Implemented for `chat_advanced` only.
 
+---
+
+Author
+* Luca :envelope: [luca6.pozzi@mail.polimi.it](mailto:luca6.pozzi@mail.polimi.it)
