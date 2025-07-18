@@ -1,10 +1,12 @@
-from .weather_tool import WeatherTool
 from .datetime_tool import DateTimeTool
+from .dummy_tool import DummyTool
+from .weather_tool import WeatherTool
 
 # Tool registry - automatically populated
 AVAILABLE_TOOLS = {
-    WeatherTool.get_name(): WeatherTool,
     DateTimeTool.get_name(): DateTimeTool,
+    DummyTool.get_name(): DummyTool,
+    WeatherTool.get_name(): WeatherTool
 }
 
 def get_tool_class(tool_name):

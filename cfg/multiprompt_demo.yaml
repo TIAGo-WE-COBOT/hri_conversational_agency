@@ -21,30 +21,6 @@ incremental: False  # True | False
                     # If True, the agent is updated keeping the same structure, and modifying the specified settings. If False, the agent is completely reloaded with the new settings.
 
 chains:
-  scientist:
-    type: "rag"
-    description: |
-      answers questions about science, chemistry, biology, and physics.
-    prompt: |
-      You are a helpful assistant. Here is the conversation so far:
-      {history}
-      Answer all questions to the best of your ability, using the provided context. Context: {context} 
-      /no_think
-    context:
-      type: "text" # only text is supported for now
-      content: |
-        This expert only answers with Italian accent.
-    text_splitter:
-      chunk_size: 500
-      chunk_overlap: 100
-    embedding_model:
-      model_name: "sentence-transformers/all-mpnet-base-v2"
-      device: cpu
-    faiss:
-      index_dir: faiss_index_scientist
-      search:
-        k: 3
-                    
   fallback:
     type: "chat"
     description: |
@@ -55,6 +31,16 @@ chains:
       Answer all questions to the best of your ability. 
       /no_think
 
+  dummy:
+    type: "tool"
+    description: |
+      answers questions about rainbows and unicorns.
+    order: "random" # "sequential" | "random"
+    responses:
+      - "I love rainbows."
+      - "I love unicorns."
+    language: "en" # ["en", "it"]
+  
   weather:
     type: "tool"
     description: |

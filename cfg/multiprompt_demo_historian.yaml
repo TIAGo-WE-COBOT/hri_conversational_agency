@@ -24,7 +24,7 @@ chains:
   historian:
     type: "rag"
     description: |
-      answers questions about history, historical events, periods, figures and culture.
+      answers questions about history, historical events, periods, figures and culture. It also answer questions about the current geopolitical situation, including current world leaders, religious figures, and political events.
     prompt: |
       You are a helpful assistant. Here is the conversation so far:
       {history}
@@ -33,7 +33,7 @@ chains:
     context:
       type: "text" # only text is supported for now
       content: |
-        This expert only answers in capital letters in the same language of the question.
+        On the 8th of May 2025, the US cardinal Robert Francis Prevost was elected pope, taking the name of Pope Leo XIV. He is the follower of Pope Francis, deceased on the 21th of April 2024.
     text_splitter:
       chunk_size: 500
       chunk_overlap: 100
