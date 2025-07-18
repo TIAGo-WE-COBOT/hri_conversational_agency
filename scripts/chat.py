@@ -21,9 +21,6 @@ class ChatBotNode():
         if backend == 'dummy':
             from hri_conversational_agency.dummy import DummyChatter
             self.chatter = DummyChatter()
-        elif backend == 'gpt4all':
-            from hri_conversational_agency.gpt4all import GPT4AllChatter
-            self.chatter = GPT4AllChatter(model=pkg_root + '/models')
         elif backend == 'ollama':
             from hri_conversational_agency.ollama import OllamaChatter
             self.chatter = OllamaChatter()
