@@ -14,6 +14,8 @@ router:
     Based on the question, choose the expert that is most relevant to answer it. Respond with the name of the expert only.
     /no_think
 
+#seed_agent: "Hi! I'm your assistant. Ask me anything." # the initial message from the agent
+seed_user: "Hello, who are you?" # the initial "simulated" message from the user to trigger the agent response
 
 #memory: True | False # enable or disable memory
 

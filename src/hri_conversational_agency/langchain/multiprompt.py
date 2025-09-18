@@ -50,7 +50,7 @@ class LangchainChatter(BaseChatter):
                             #   'content': 'message content'
                             # }
 
-    def __init__(self, config):
+    def __init__(self, config, verbose=True):
         """Initialize the LangchainChatter object.
 
         Args:
@@ -64,14 +64,12 @@ class LangchainChatter(BaseChatter):
         } # NOTE. 'destinations' chains are sometimes referred to as 'experts' elsewhere in the code.
         # Initialize the agent (empty) memory
         self.set_history([])
+        # Initialize the logger to store the dialogue history
+        self.log = Logger(verbose=verbose)
+        self.log.logfile_open()
         # Load the configuration from the YAML file
         self.set_config(config)
-        # Initialize the logger to store the dialogue history
-        self.log = Logger(
-            agent_name=f'langchain - {self.llm_cfg["model"]}')
-        self.log.logfile_open()
-        print("Ready to chat!")
-
+        
     #region Chain registry methods
     def _register_config(self, config_name):
         """Register a configuration in the registry."""
@@ -118,6 +116,14 @@ class LangchainChatter(BaseChatter):
         Returns:
             string: The response from the agent.
         """
+        # If agent seed is pending, return it and clear the flag
+        if getattr(self, "seed_agent", None) is not None:
+            response = self.seed_agent
+            self.seed_agent = None
+            # Add to history as assistant message
+            self.messages.append({'role': 'assistant', 'content': response})
+            self.log.log_output(f"[seed] {response}")
+            return response
         # Log the input for later inspection of the dialogue
         self.log.log_input(request)
         # Generate the response
@@ -136,6 +142,9 @@ class LangchainChatter(BaseChatter):
         """Receive filepath to a YAML file containing the configuration of the agent."""
         with open(yaml_path, 'r', encoding='utf-8') as f:
             cfg = yaml.safe_load(f)
+        # Handle seeds
+        seed_agent = cfg.pop("seed_agent", None)
+        seed_user = cfg.pop("seed_user", None)
         # Check incremental flag.
         incremental = cfg.pop("incremental", False)
         if not incremental: 
@@ -153,6 +162,7 @@ class LangchainChatter(BaseChatter):
         updated_chains = []
         # 1. Set/Update LLM config (always required)
         llm_updated = self._update_cfg(cfg.pop("model", {}), "llm", self._build_llm)
+        self.log.set_agent_name(f'langchain - {self.llm_cfg["model"]}')
         # 2. Get chains configuration
         chains_dict = cfg.pop("chains", {})
         # 3. Handle removed chains (only in incremental mode)
@@ -192,7 +202,15 @@ class LangchainChatter(BaseChatter):
             self._build_app()
         else:
             print("No changes detected, keeping existing app")
-    
+        # 9. Set the agent seed if present in the current config update
+        if seed_agent:
+            self.seed_agent = seed_agent
+            self.messages.append({'role': 'assistant', 'content': self.seed_agent})
+            self.log.log_output(f"[seed] {self.seed_agent}")
+
+        if seed_user:
+            self.generate_response(seed_user)
+
     def set_history(self, history):
         """Receive a list of tuples (role, content) to set the history of the agent. Any previous history will be overwritten.
 
@@ -409,7 +427,18 @@ class LangchainChatter(BaseChatter):
         chain_cfg = getattr(self, f"{current_chain}_cfg")
         # Get the prompt and handle optional variables
         prompt = chain_cfg["prompt"]
-        # Check if {interests} is in the prompt and substitute if not provided
+        # Check if there are {fields} in the prompt and substitute if {field} is specified in config
+        for field in re.findall("(?<={)(.*?)(?=})", prompt):
+            if field in ['context', 'input', 'history']:
+                # These are provided at runtime, skip
+                continue
+            field_list = chain_cfg.get(field, [])
+            if field_list:
+                field_str = field.join(", ")
+            else:
+                field_str = ""
+            prompt = prompt.replace(f"{{{field}}}", field_str)
+        '''
         if "{interests}" in prompt:
             interests_list = chain_cfg.get("interests", [])
             if interests_list:
@@ -417,7 +446,7 @@ class LangchainChatter(BaseChatter):
             else:
                 interests_str = ""
             prompt = prompt.replace("{interests}", interests_str)
-        
+        '''
         # Build the chat chain
         chat_chain = (
             self._format_chat_prompt(prompt) 
@@ -454,6 +483,22 @@ class LangchainChatter(BaseChatter):
     #endregion
     
     #region Helper methods for configuration and chain building
+    def _clear_config_and_chain(self, name):
+        """Clear both config and chain for a given name."""
+        # Remove config
+        config_attr = f"{name}_cfg"
+        if hasattr(self, config_attr):
+            delattr(self, config_attr)
+            print(f"  Cleared {config_attr}")
+        # Remove chain object
+        chain_attr = f"{name}_chain"
+        if hasattr(self, chain_attr):
+            delattr(self, chain_attr)
+            print(f"  Cleared {chain_attr}")
+        # Unregister from registry
+        self._unregister_config(name)
+        self._unregister_chain(name)
+
     def _update_cfg(self, new_cfg, cfg_key, builder_method):
         """Helper method to check, merge, and rebuild config sections.
         
@@ -492,22 +537,6 @@ class LangchainChatter(BaseChatter):
         else:
             print(f"  No changes in {cfg_key} configuration")
             return False
-
-    def _clear_config_and_chain(self, name):
-        """Clear both config and chain for a given name."""
-        # Remove config
-        config_attr = f"{name}_cfg"
-        if hasattr(self, config_attr):
-            delattr(self, config_attr)
-            print(f"  Cleared {config_attr}")
-        # Remove chain object
-        chain_attr = f"{name}_chain"
-        if hasattr(self, chain_attr):
-            delattr(self, chain_attr)
-            print(f"  Cleared {chain_attr}")
-        # Unregister from registry
-        self._unregister_config(name)
-        self._unregister_chain(name)
 
     def _remove_deleted_chains(self, new_chains_dict):
         """Remove chains that exist but are not in the new configuration."""
@@ -579,7 +608,7 @@ class LangchainChatter(BaseChatter):
         text = re.sub(emoj, '', text)
         text = text.replace('*', ' ')  # remove asterisks
         # Remove leading/trailing whitespace and newlines
-        return text.strip() + '\n\n'
+        return text.strip()
 
     @staticmethod
     def _format_chat_prompt(prompt):

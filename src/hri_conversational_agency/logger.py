@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 class Logger:
-    def __init__(self, agent_name='agent'):
+    def __init__(self, agent_name='agent', verbose=False):
         # Check for the `log` folder existence
         pkg_root = os.path.join(
             os.path.abspath(os.path.dirname(__file__)),
@@ -26,15 +26,23 @@ class Logger:
             f.close()
         except FileExistsError:
             pass
-        # Define the agent name for logging
+        # Define the agent name for logging (if provided)
         self.agent_name = agent_name.upper()
+        # Enable disable printing messages to 
+        self.verbose = verbose
 
     def log_input(self, string):
-        self.f.write('USER: {}\n\n'.format(string))
+        msg = 'USER: {}'.format(string)
+        if self.verbose:
+            print(msg)
+        self.f.write(msg + '\n\n' )
 
     def log_output(self, response):
-        self.f.write('{}: {}\n\n'.format(self.agent_name, response))
-    
+        msg = '{}: {}'.format(self.agent_name, response)
+        if self.verbose:
+            print(msg)
+        self.f.write(msg + '\n\n')
+
     def log_system_prompt(self, prompt):
         self.f.write('SYSTEM: {}\n\n'.format(prompt))
 
@@ -44,6 +52,9 @@ class Logger:
 
     def logfile_close(self):
         self.f.close()
+    
+    def set_agent_name(self, name):
+        self.agent_name = name.upper()
 
     def _get_date(self):
         return datetime.now().strftime("%Y/%m/%d")
