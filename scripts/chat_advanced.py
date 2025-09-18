@@ -11,6 +11,8 @@ import rospkg
 from chat_simple import ChatBotNode
 from hri_conversational_agency.langchain.multiprompt import LangchainChatter
 from hri_conversational_agency.srv import SetAgentConfig, SetAgentConfigResponse
+from hri_conversational_agency.msg import ChainStats, AgentStats
+from hri_conversational_agency.srv import GetAgentStats, GetAgentStatsResponse
 
 class ExtendedChatBotNode(ChatBotNode):
     def __init__(self, backend='langchain', **kwargs):
@@ -38,11 +40,26 @@ class ExtendedChatBotNode(ChatBotNode):
 
     def _init_services(self):
         super()._init_services()
+        self.get_agent_stats_srv = rospy.Service('get_agent_stats',
+                                                 GetAgentStats,
+                                                 self.get_agent_stats
+                                                 )
         self.set_config_srv = rospy.Service('set_config',
                                             SetAgentConfig,
                                             self.set_config
                                             )
     
+    def get_agent_stats(self, req):
+        stats = self.chatter.get_agent_stats()
+        stats_msg = AgentStats()
+        for chain_name, chain_stats in stats.items():
+            stats_msg.chain_names.append(chain_name)
+            stats_msg.chain_stats.append(
+                ChainStats(calls_count=chain_stats['calls_count'])
+            )
+        res = GetAgentStatsResponse(stats=stats_msg)
+        return res
+
     def set_sys_prompt(self, req):
         raise NotImplementedError(
             "The set_sys_prompt service is not implemented in the ExtendedChatBotNode. Use set_config instead."

@@ -50,12 +50,15 @@ catkin_python_setup()
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  AgentStats.msg
+  ChainStats.msg
   ChatMessage.msg
 )
 
 ## Generate services in the 'srv' folder
 add_service_files(
   FILES
+  GetAgentStats.srv
   SetHistory.srv
   SetAgentContent.srv
   SetAgentConfig.srv

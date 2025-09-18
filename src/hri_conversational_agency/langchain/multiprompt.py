@@ -67,6 +67,8 @@ class LangchainChatter(BaseChatter):
         # Initialize the logger to store the dialogue history
         self.log = Logger(verbose=verbose)
         self.log.logfile_open()
+        # Initialize an empty dict to track the app stats
+        self.stats = {}
         # Load the configuration from the YAML file
         self.set_config(config)
         
@@ -138,6 +140,10 @@ class LangchainChatter(BaseChatter):
         self.log.log_output(f"[{state['destination']['destination'].lower()}] {response}")
         return response
 
+    def get_agent_stats(self):
+        """Return a copy of the router call statistics."""
+        return dict(self.stats)
+
     def set_config(self, yaml_path):
         """Receive filepath to a YAML file containing the configuration of the agent."""
         with open(yaml_path, 'r', encoding='utf-8') as f:
@@ -174,6 +180,9 @@ class LangchainChatter(BaseChatter):
         router_cfg = cfg.pop("router", {})
         # 5. Set/Update each chain configuration
         for chain_name, chain_config in chains_dict.items():
+            # Initialize stats tracking for the chain if not present
+            if chain_name not in self.stats:
+                self.stats[chain_name] = {"calls_count": 0}
             # Check if there is any parametric field in the chain config and format it
             self._format_parametric_field(chain_config, "description")
             self._format_parametric_field(
@@ -302,6 +311,8 @@ class LangchainChatter(BaseChatter):
         """
         destination = state["destination"]["destination"].lower()
         print("Routing to destination:", destination)
+        # Track call for the destination chain
+        self.stats[destination]["calls_count"] += 1
         # Use registry to check if chain exists
         if destination in self._chain_registry['chains']:
             return f"{destination}_query"
@@ -629,6 +640,5 @@ class LangchainChatter(BaseChatter):
         """Format the router prompt with the experts."""
         experts_str = "\n".join([f"- {name}: {desc}" 
                                for name, desc in experts.items()])
-        print(prompt.format(experts=experts_str))
         return prompt.format(experts=experts_str)
     #endregion
