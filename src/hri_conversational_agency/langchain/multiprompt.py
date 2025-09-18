@@ -33,7 +33,7 @@ except ImportError:
 
 class LangchainChatter(BaseChatter):
     SYSTEM_COMPONENTS = ['llm', 'router']  # these components might have associated configurations but are not considered "expert" chains
-    
+    SYSTEM_FIELDS = ['context', 'input', 'history']  # fields that are managed by the system and should not be altered by parametric formatting (see `_format_parametric_field`)
     # Define schema for multi-prompt chain output
     class RouteQuery(TypedDict):
         """Route query to destination expert."""
@@ -170,14 +170,16 @@ class LangchainChatter(BaseChatter):
             removed_chains = self._remove_deleted_chains(chains_dict)
             if removed_chains:
                 updated_chains.extend(removed_chains)
-        # 4. Set/Update router config with extracted experts
+        # 4. Extract router config
         router_cfg = cfg.pop("router", {})
-        experts_dict = {name: chain_cfg["description"] 
-                       for name, chain_cfg in chains_dict.items() 
-                       if "description" in chain_cfg}
-        router_cfg["experts"] = experts_dict
         # 5. Set/Update each chain configuration
         for chain_name, chain_config in chains_dict.items():
+            # Check if there is any parametric field in the chain config and format it
+            self._format_parametric_field(chain_config, "description")
+            self._format_parametric_field(
+                chain_config, "prompt", 
+                skip_fields=LangchainChatter.SYSTEM_FIELDS
+            )
             chain_type = chain_config.get('type')
             if chain_type == 'rag':
                 builder_method = self._build_rag_chain
@@ -191,18 +193,23 @@ class LangchainChatter(BaseChatter):
             # Update the chain and track if it changed
             if self._update_cfg(chain_config, chain_name, builder_method):
                 updated_chains.append(chain_name)
-        # 6. Set/Update RouteQuery destinations 
+        # 6. Set/Update router with available experts
+        experts_dict = {name: chain_cfg["description"] 
+                       for name, chain_cfg in chains_dict.items() 
+                       if "description" in chain_cfg}
+        router_cfg["experts"] = experts_dict
+        # 7. Set/Update RouteQuery destinations
         if updated_chains or not incremental:
             self.RouteQuery.__annotations__["destination"] = Literal[tuple(self._get_destination_chains())]
-        # 7. Set/Update router
+        # 8. Set/Update router
         router_updated = self._update_cfg(router_cfg, "router", self._build_router_chain)
-        # 8. Rebuild app if anything changed
+        # 9. Rebuild app if anything changed
         if updated_chains or router_updated or llm_updated or not incremental:
             print(f"Rebuilding app -Updated chains: {updated_chains}, Router: {router_updated}, LLM: {llm_updated}")
             self._build_app()
         else:
             print("No changes detected, keeping existing app")
-        # 9. Set the agent seed if present in the current config update
+        # 10. Set the agent seed if present in the current config update
         if seed_agent:
             self.seed_agent = seed_agent
             self.messages.append({'role': 'assistant', 'content': self.seed_agent})
@@ -425,35 +432,14 @@ class LangchainChatter(BaseChatter):
         print(f"Building {current_chain} (chat) chain...", end=' ', flush=True)
         # Use the specific chain's config
         chain_cfg = getattr(self, f"{current_chain}_cfg")
-        # Get the prompt and handle optional variables
-        prompt = chain_cfg["prompt"]
-        # Check if there are {fields} in the prompt and substitute if {field} is specified in config
-        for field in re.findall("(?<={)(.*?)(?=})", prompt):
-            if field in ['context', 'input', 'history']:
-                # These are provided at runtime, skip
-                continue
-            field_list = chain_cfg.get(field, [])
-            if field_list:
-                field_str = field.join(", ")
-            else:
-                field_str = ""
-            prompt = prompt.replace(f"{{{field}}}", field_str)
-        '''
-        if "{interests}" in prompt:
-            interests_list = chain_cfg.get("interests", [])
-            if interests_list:
-                interests_str = "Your interests include: " + ", ".join(interests_list) + "."
-            else:
-                interests_str = ""
-            prompt = prompt.replace("{interests}", interests_str)
-        '''
+        # Update config dictionary if changed
+        setattr(self, f"{current_chain}_cfg", chain_cfg)
         # Build the chat chain
         chat_chain = (
-            self._format_chat_prompt(prompt) 
+            self._format_chat_prompt(chain_cfg["prompt"]) 
             | self.llm 
             | StrOutputParser()
         )
-        
         # Store the chain with the specific name
         setattr(self, f"{current_chain}_chain", chat_chain)
         self._register_chain(current_chain)
@@ -577,13 +563,6 @@ class LangchainChatter(BaseChatter):
 
     #region Static methods for string/prompt formatting
     @staticmethod
-    def _format_router_prompt(prompt, experts):
-        """Format the router prompt with the experts."""
-        experts_str = "\n".join([f"- {name}: {desc}" 
-                               for name, desc in experts.items()])
-        return prompt.format(experts=experts_str)
-    
-    @staticmethod
     def _format_answer(text: str) -> str:
         """Remove <think>...</think> blocks, emojis, and trailing newlines."""
         # Remove all <think>...</think> blocks (including newlines inside)
@@ -619,4 +598,37 @@ class LangchainChatter(BaseChatter):
                 ("human", "{input}"),
             ]
         )
+    
+    @staticmethod
+    def _format_parametric_field(cfg, entry, skip_fields=None, list_join=", "):
+        """Format a parametric field in the configuration.
+
+        Args:
+            cfg (dict): The configuration dictionary.
+            entry (str): The entry key to format.
+            skip_fields (list, optional): List of fields to skip. Defaults to None.
+            list_join (str, optional): String to join list values. Defaults to ", ".
+        """
+        if skip_fields is None:
+            skip_fields = []
+        if entry not in cfg:
+            return
+        value = cfg[entry]
+        for field in re.findall("(?<={)(.*?)(?=})", value):
+            if field in skip_fields:
+                continue
+            replacement = cfg.get(field, "")
+            if isinstance(replacement, list):
+                replacement = list_join.join(str(v) for v in replacement)
+            value = value.replace(f"{{{field}}}", str(replacement))
+        cfg[entry] = value
+        return cfg
+    
+    @staticmethod
+    def _format_router_prompt(prompt, experts):
+        """Format the router prompt with the experts."""
+        experts_str = "\n".join([f"- {name}: {desc}" 
+                               for name, desc in experts.items()])
+        print(prompt.format(experts=experts_str))
+        return prompt.format(experts=experts_str)
     #endregion
