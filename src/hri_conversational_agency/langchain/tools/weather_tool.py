@@ -33,7 +33,7 @@ class WeatherTool(BaseTool):
     def __init__(self, config):
         self.location = config.get('location', 'New York')
         self.language = config.get('language', 'en')
-        self.api_key = config.get('api_key', "646c1930c10a69e4095e057c9ed149da")
+        self.api_key = config.get('api_key', "<your-api-key-goes-here>")
     
     def __call__(self):
         """Get weather information."""
