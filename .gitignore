@@ -2,6 +2,7 @@
 log/*
 models/*
 embeddings/*
+src/hri_conversational_agency/langchain/tools/_secrets.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

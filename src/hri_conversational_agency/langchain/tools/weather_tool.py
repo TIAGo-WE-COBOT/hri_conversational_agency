@@ -1,4 +1,5 @@
 from .base_tool import BaseTool
+from ._secrets import OPEN_WEATHER_API_KEY
 import requests
 
 # Weather message templates
@@ -33,7 +34,7 @@ class WeatherTool(BaseTool):
     def __init__(self, config):
         self.location = config.get('location', 'New York')
         self.language = config.get('language', 'en')
-        self.api_key = config.get('api_key', "<your-api-key-goes-here>")
+        self.api_key = config.get('api_key', OPEN_WEATHER_API_KEY)
     
     def __call__(self):
         """Get weather information."""
