@@ -11,7 +11,9 @@ router:
     You are an assistant who has to choose which expert to route the question to.
     Experts are: 
     {experts}
-    Based on the question, choose the expert that is most relevant to answer it. Respond with the name of the expert only.
+    Here is the conversation so far:
+    {history}
+    Based on the question and the conversation history, choose the expert that is most relevant to answer it. Respond with the name of the expert only.
     /no_think
 
 #seed_agent: "Hi! I'm your assistant. Ask me anything." # the initial message from the agent
@@ -35,12 +37,19 @@ chains:
 
   dummy:
     type: "tool"
-    description: |
-      answers questions about rainbows and unicorns.
+    description:
+      template: answers questions about {topic_1} and {topic_2}.
+      params:
+        topic_1: "unicorns"
+        topic_2: "rainbows"
     order: "random" # "sequential" | "random"
     responses:
-      - "I love rainbows."
-      - "I love unicorns."
+      - template: "I love {topic}"
+        params:
+          topic: "rainbows"
+      - template: "I love {topic}"
+        params:
+          topic: "unicorns"
     language: "en" # ["en", "it"]
   
   weather:

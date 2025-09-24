@@ -120,6 +120,7 @@ class LangchainChatter(BaseChatter):
         """
         # If agent seed is pending, return it and clear the flag
         if getattr(self, "seed_agent", None) is not None:
+            print("Input {} received while seed pending, returning seed response".format(request))
             response = self.seed_agent
             self.seed_agent = None
             # Add to history as assistant message
@@ -180,15 +181,22 @@ class LangchainChatter(BaseChatter):
         router_cfg = cfg.pop("router", {})
         # 5. Set/Update each chain configuration
         for chain_name, chain_config in chains_dict.items():
+            # Check if there is any parametric entry in the chain config and format it
+            for key, value in chain_config.items():
+                #if key in self.SYSTEM_ENTRIES: 
+                #    continue  # skip system fields
+                # NOTE. The above two lines are kept to remind the logic, but there is not reason to skip any entry here.
+                chain_config[key] = self._resolve_parametric_entry(
+                    value, skip_fields=self.SYSTEM_FIELDS
+                )
+            # The chain is named after the name field if present, otherwise use the key itself (and add the name field).
+            if chain_config.get("name", None) is None:
+                chain_config["name"] = chain_name
+            else:
+                chain_name = chain_config["name"]
             # Initialize stats tracking for the chain if not present
             if chain_name not in self.stats:
                 self.stats[chain_name] = {"calls_count": 0}
-            # Check if there is any parametric field in the chain config and format it
-            self._format_parametric_field(chain_config, "description")
-            self._format_parametric_field(
-                chain_config, "prompt", 
-                skip_fields=LangchainChatter.SYSTEM_FIELDS
-            )
             chain_type = chain_config.get('type')
             if chain_type == 'rag':
                 builder_method = self._build_rag_chain
@@ -203,8 +211,8 @@ class LangchainChatter(BaseChatter):
             if self._update_cfg(chain_config, chain_name, builder_method):
                 updated_chains.append(chain_name)
         # 6. Set/Update router with available experts
-        experts_dict = {name: chain_cfg["description"] 
-                       for name, chain_cfg in chains_dict.items() 
+        experts_dict = {chain_cfg["name"]: chain_cfg["description"] 
+                       for __, chain_cfg in chains_dict.items() 
                        if "description" in chain_cfg}
         router_cfg["experts"] = experts_dict
         # 7. Set/Update RouteQuery destinations
@@ -221,8 +229,7 @@ class LangchainChatter(BaseChatter):
         # 10. Set the agent seed if present in the current config update
         if seed_agent:
             self.seed_agent = seed_agent
-            self.messages.append({'role': 'assistant', 'content': self.seed_agent})
-            self.log.log_output(f"[seed] {self.seed_agent}")
+            #self.generate_response(request = None)
 
         if seed_user:
             self.generate_response(seed_user)
@@ -249,7 +256,9 @@ class LangchainChatter(BaseChatter):
         Returns:
             dict: A dictionary with the destination expert for the query.
         """
-        destination = self.router_chain.invoke(state["query"], config)
+        destination = self.router_chain.invoke({"input": state["query"],
+                                                "history": state["history"]},
+                                                config)
         return {"destination": destination}
     
     def chat_query(self, state: State, config: RunnableConfig):
@@ -525,7 +534,7 @@ class LangchainChatter(BaseChatter):
                 print(f"{cfg_key} updated successfully")
                 return True
             except Exception as e:
-                print(f"Failed to update {cfg_key}: {e}")
+                print(f"Failed to update {cfg_key}: {repr(e)}")
                 return False
             finally:
                 # Clean up
@@ -611,34 +620,52 @@ class LangchainChatter(BaseChatter):
         )
     
     @staticmethod
-    def _format_parametric_field(cfg, entry, skip_fields=None, list_join=", "):
-        """Format a parametric field in the configuration.
-
-        Args:
-            cfg (dict): The configuration dictionary.
-            entry (str): The entry key to format.
-            skip_fields (list, optional): List of fields to skip. Defaults to None.
-            list_join (str, optional): String to join list values. Defaults to ", ".
-        """
-        if skip_fields is None:
-            skip_fields = []
-        if entry not in cfg:
-            return
-        value = cfg[entry]
-        for field in re.findall("(?<={)(.*?)(?=})", value):
-            if field in skip_fields:
-                continue
-            replacement = cfg.get(field, "")
-            if isinstance(replacement, list):
-                replacement = list_join.join(str(v) for v in replacement)
-            value = value.replace(f"{{{field}}}", str(replacement))
-        cfg[entry] = value
-        return cfg
-    
-    @staticmethod
     def _format_router_prompt(prompt, experts):
         """Format the router prompt with the experts."""
         experts_str = "\n".join([f"- {name}: {desc}" 
                                for name, desc in experts.items()])
-        return prompt.format(experts=experts_str)
-    #endregion
+        # TODO. Re-adding {history} to the prompt seems to work, but its not really elegant.
+        return prompt.format(experts=experts_str, history="{history}")
+
+    @staticmethod
+    def _resolve_parametric_entry(entry, skip_fields=None, list_join=", "):
+        """
+        Resolve a parametric entry in the config.
+        If entry is a dict with 'template' and 'params', format it substituting each {field} with the `field` value in params. Otherwise, return as is.
+
+        Args:
+            entry (dict | list |str): The entry to resolve.
+            skip_fields (list, optional): List of fields to skip inside formatting.
+            list_join (str, optional): String to join list values.
+
+        Returns:
+            The resolved entry value.
+        """
+        if skip_fields is None:
+            skip_fields = []
+        # Handle list of entries
+        if isinstance(entry, list):
+            entry_resolved = []
+            for item in entry: # process items one-by-one
+                entry_resolved.append(
+                    LangchainChatter._resolve_parametric_entry(
+                        item, skip_fields, list_join)
+                )
+        # Handle parametric entry
+        elif isinstance(entry, dict) and "template" in entry and "params" in entry:
+            # Use the template as the value to format
+            template, params = entry["template"], entry["params"]
+            entry_resolved = template
+            # Find all {field} in the template and replace them with params values
+            for field in re.findall("(?<={)(.*?)(?=})", template):
+                if field in skip_fields:
+                    continue
+                replacement = params.get(field, "")
+                if isinstance(replacement, list):
+                    replacement = list_join.join(str(v) for v in replacement)
+                entry_resolved = entry_resolved.replace(f"{{{field}}}", str(replacement))
+        # Handle other cases (str, int, float, etc.)
+        else:
+            entry_resolved = entry # return as is
+        return entry_resolved
+        # endregion
