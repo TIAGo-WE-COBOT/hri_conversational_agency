@@ -40,7 +40,7 @@ class ExtendedChatBotNode(ChatBotNode):
 
     def _init_services(self):
         super()._init_services()
-        self.get_agent_stats_srv = rospy.Service('get_agent_stats',
+        self.get_agent_stats_srv = rospy.Service('get_stats',
                                                  GetAgentStats,
                                                  self.get_agent_stats
                                                  )
