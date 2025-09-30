@@ -20,7 +20,9 @@ class ChatBotNode():
         # Initialize the agent to generate responses
         if backend == 'dummy':
             from hri_conversational_agency.dummy import DummyChatter
-            self.chatter = DummyChatter()
+            print(kwargs)
+            responses = kwargs.get('responses', None)
+            self.chatter = DummyChatter(responses=responses) if responses else DummyChatter()
         elif backend == 'ollama':
             from hri_conversational_agency.ollama import OllamaChatter
             self.chatter = OllamaChatter()
@@ -107,7 +109,7 @@ if __name__ == "__main__":
                         )
     args, kwargs = parser.parse_known_args(rospy.myargv()[1:])
     cb = ChatBotNode(backend=args.backend, 
-                     **dict((kwargs[i].rstrip('--'), kwargs[i+1]) 
+                     **dict((kwargs[i].lstrip('--'), kwargs[i+1]) 
                      for i in range(0, len(kwargs), 2))
                     )
     rospy.on_shutdown(cb.chatter.on_shutdown)
