@@ -73,7 +73,8 @@ This package is a container for ROS modules, developed for easy integration of c
 * Install Ollama as per instructions in [Installation/Backend/Ollama](#ollama) section.
 * Install Langchain and its required components
     ```
-    pip install -qU langchain-core langchain-ollama langgraph
+    pip install -qU langchain-core langchain-ollama langgraph langchain-text-splitters langchain-huggingface langchain-community
+
     ```
 * Pull the model you will use with `ollama pull <model>`. To be able to run the `chat_advanced.py` node out-of-the-box, you have to pull the model used as default first. To do so:
     * Start Ollama
