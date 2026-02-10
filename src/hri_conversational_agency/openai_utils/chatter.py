@@ -50,74 +50,6 @@ class OpenAIChatter():
         #                               self.frequency_penalty,
         #                               self.presence_penalty
         #                               )
-    ###POSSIBILE RIORGANIZZAZIONE DEL CODICE
-    # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):
-    #     n_mod = 4 #to test a predefined prompt
-    #     if(self.curr_mod == "P_LLM"):
-    #         if(not self.check_media_flag): #check
-    #             if(not self.end_timer_flag):
-    #                 self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #                 #self.log.log_system_prompt(self.s_prompt)
-    #             elif(self.end_timer_flag):
-    #                 self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #                 #self.log.log_system_prompt(self.s_prompt)
-    #                 self.check_media_flag = True
-    #         elif(self.check_media_flag):
-    #             self.play_media_flag = True
-    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-    #             #self.log.log_system_prompt(self.s_prompt)
-
-    #     elif(self.curr_mod == "LLM"):
-    #         if(not self.check_media_flag):
-    #             if(not self.end_timer_flag):
-    #                 self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-    #                 #self.log.log_system_prompt(self.s_prompt)
-    #             elif(self.end_timer_flag):
-    #                 self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
-    #                 #self.log.log_system_prompt(self.s_prompt)
-    #                 self.check_media_flag = True
-    #         elif(self.check_media_flag):
-    #             self.play_media_flag = True
-    #             self.s_prompt = MEDIA_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-    #             #self.log.log_system_prompt(self.s_prompt)
-
-    ###CODICE RIORGANIZZATO, DA TESTARE, POSSIBILE ULTERIORE RIORGANIZZAZIONE
-    # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
-    #         if(not self.check_media_flag): #check
-    #             if(not self.end_timer_flag):
-    #                 if(self.curr_mod == "P_LLM"):
-    #                     self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #                 elif(self.curr_mod == "LLM"):
-    #                     self.s_prompt = STD- story: happy path
-#   steps:
-#   - intent: greet
-#   - action: utter_greet
-#   - intent: mood_great #mettere anche che non sto molto bene(condizione o altra storia)
-#   - action: utter_ask_hobbies
-#   - intent: ask_hobbies
-
-    # def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
-    #          #check
-    #         if(not self.end_timer_flag):
-    #             if(self.curr_mod == "P_LLM"):
-    #                 self.s_prompt = PERS_SYSTEM_PROMPT_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #             elif(self.curr_mod == "LLM"):
-    #                 self.s_prompt = STD_SYSTEM_PROMPT_TEMPLATE
-    #         elif(self.end_timer_flag):
-    #             if(not self.check_media_flag):
-    #                 if(self.curr_mod == "P_LLM"):
-    #                     self.s_prompt = PERS_SYSTEM_PROMPT_END_TEMPLATE.format(gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness)
-    #                 elif(self.curr_mod == "LLM"):
-    #                     self.s_prompt = STD_SYSTEM_PROMPT_END_TEMPLATE
-    #                 self.check_media_flag = True
-    #             elif(self.check_media_flag):
-    #                 if(self.curr_media == "M"):
-    #                     self.s_prompt = MUSIC_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-    #                 elif(self.curr_media == "V"):
-    #                     self.s_prompt = VIDEO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista video
-    #                 elif(self.curr_media == "AL"):
-    #                     self.s_prompt = AUDIOLIBRO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista audiolibro
-    #                 self.find_media_flag = True #probabilmente è meglio metterla dopo check associazione media-risposta
     
     def generate_s_prompt(self, gender, age, education, job, interests, extraversion, agreeableness, conscientiousness, neuroticism, openness):    
              #check
@@ -149,15 +81,7 @@ class OpenAIChatter():
                             self.s_prompt = STD_SYSTEM_PROMPT_END_AL_TEMPLATE###mettere lista audiolibro
                         #self.check = True
                         print("qui check")
-                # elif(self.check_media_flag):
-                #     if(self.curr_media == "M"):
-                #         self.s_prompt = MUSIC_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista dei media
-                #     elif(self.curr_media == "V"):
-                #         self.s_prompt = VIDEO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista video
-                #     elif(self.curr_media == "AL"):
-                #         self.s_prompt = AUDIOLIBRO_PROPOSAL_PROMPT.format("['Bad Romance', 'Bandita', 'Blue Sky', 'Closer', 'Pamplona']")###mettere lista audiolibro
-                #     #self.find_media_flag = True #probabilmente è meglio metterla dopo check associazione media-risposta
-    
+                
 
     #methods to add the system prompts, the user messages and the model responses to the dictionary containing all the conversation
     def add_c_s_prompt(self):
@@ -221,7 +145,7 @@ class OpenAIChatter():
         print(self.messages)
 
         if(self.end_timer_flag):
-            print(model_resp) #DA TESTARE
+            print(model_resp)
 
             model_resp = model_resp.lower().strip("#").strip('"') #In some cases the model adds "\n"
             if(self.curr_media == "M"):
