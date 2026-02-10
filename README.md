@@ -4,13 +4,8 @@ This package is a container for ROS modules, developed for easy integration of c
 
 ## Installation
 
-1. Install prerequirements. TODO.
+Clone the repo and build with `caktin build` or `catkin_make` depending on your workspace setup.
 
-2. Clone the repo
-
-3. Build (e.g. with `caktin build`)
-
-4. 
 ## Setup
 
 ### OpenAI
@@ -19,7 +14,7 @@ This package is a container for ROS modules, developed for easy integration of c
 
 #### Alternatives
 
-1. 
+1. **Legacy**
 
 - Set it in `src/conversational_agency/openai_utils/cfg.py`
 
@@ -36,15 +31,11 @@ to prevent the file with your API key to be uploaded in Github on push.
 ```
 git update-index --skip-worktree src/conversational_agency/openai_utils/cfg.py
 ```
-2. Actually employed:
+2. **Current [recommended].**
 
 - Create a `.env` file and set the API key in as OPENAI_API_KEY = <your_API_key>
 
 - Check that `.env` extension is included in the `.gitignore` file. In this way it will not be pushed on Github.
-
-## How to run
-
-TODO.
 
 ## How to use
 It's possible to launch the package in four possible configurations:
@@ -52,32 +43,27 @@ It's possible to launch the package in four possible configurations:
    
 Depending on where you want to launch audio_capture and soundplay you can:
 
-2. launch the conversational agent script, whisper_node and soundplay in one terminal using the command:
+2. launch the conversational agent script, `whisper_node` and soundplay in one terminal using the command:
    ```
    roslaunch hri_conversational_agency chat_vocal.launch audio_capture:=false
    ```
-   and then launch audio_capture in another terminal (E.g. TIAGo)
+   and then launch `audio_capture` in another terminal (*e.g.*, TIAGo).
    
-3. launch the conversational agent script, whisper_node and audio_capture in one terminal using the command:
+3. launch the conversational agent script, `whisper_node` and `audio_capture` in one terminal using the command:
    ```
    roslaunch hri_conversational_agency chat_vocal.launch tts:=false
    ```
-   and then launch soundplay in another terminal (E.g. TIAGo)
+   and then launch `soundplay` in another terminal (*e.g.*, TIAGo).
    
-4. launch the conversational agent script, whisper_node in one terminal using the command:
+4. launch the conversational agent script, `whisper_node` in one terminal using the command:
    ```
    roslaunch hri_conversational_agency chat_vocal.launch audio_capture:=false tts:=false
    ```
-   and then launch audio_capture and soundplay in different terminals (in a separate way)
+   and then launch `audio_capture` and `soundplay` in different terminals.
 
 ## Troubleshooting
 
 ### - openai.error.AuthenticationError: \<empty message\>
 The error is tracked in this [Github issue](https://github.com/openai/openai-python/issues/464). Try to generate a new API key and replace the existing one.
-
-## TODO
-
-- [ ] modify the package name to `hri_conversational_agency` in the README
-- [ ] set the API key in a different way. As of now, one cannot commit changes to (e.g.) `PROMPT_TEMPLATE`
-    - [ ] env variable
+[ ] env variable
     - [ ] different file
